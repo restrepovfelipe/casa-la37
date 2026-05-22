@@ -164,38 +164,76 @@ export default function LocalesPage() {
         {locales.length === 0 && (
           <p className="text-sm" style={{ color: 'oklch(0.520 0.015 60)' }}>No hay locales aún.</p>
         )}
-        {locales.map(l => (
-          <Card key={l.id}>
+        {(() => {
+          // Agrupar locales con el mismo nombre (ej: Makeno ocupa 305 y 401)
+          const grupos: Local[][] = []
+          const vistos = new Set<string>()
+          locales.forEach(l => {
+            if (vistos.has(l.id)) return
+            if (l.nombre) {
+              const hermanos = locales.filter(x => x.nombre === l.nombre)
+              hermanos.forEach(x => vistos.add(x.id))
+              grupos.push(hermanos)
+            } else {
+              vistos.add(l.id)
+              grupos.push([l])
+            }
+          })
+          return grupos.map(grupo => {
+            const principal = grupo[0]
+            const esGrupo = grupo.length > 1
+            const numerosLabel = grupo.map(x => x.numero).join(' y ')
+            const arriendoTotal = grupo.reduce((s, x) => s + x.arriendo_actual, 0)
+            return (
+          <Card key={grupo.map(x=>x.id).join('-')}>
             <CardContent className="pt-4">
               <div className="flex items-start justify-between">
                 <div className="space-y-1 flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium" style={{ color: 'oklch(0.185 0.020 55)' }}>
-                      {l.numero}{l.nombre ? ` — ${l.nombre}` : ''}
+                      {numerosLabel}{principal.nombre ? ` — ${principal.nombre}` : ''}
                     </p>
-                    {!l.activo && <Badge variant="secondary">Inactivo</Badge>}
+                    {esGrupo && (
+                      <Badge variant="secondary" className="text-xs">2 locales</Badge>
+                    )}
+                    {grupo.every(x => !x.activo) && <Badge variant="secondary">Inactivo</Badge>}
                   </div>
                   <p className="text-sm" style={{ color: 'oklch(0.520 0.015 60)' }}>
                     Arriendo:{' '}
-                    <span className="font-semibold" style={{ color: '#9A7B35' }}>{formatCOP(l.arriendo_actual)}</span>
-                    {' · '}Propietario: {(l.propietarios as Propietario)?.nombre ?? 'Sin asignar'}
+                    <span className="font-semibold" style={{ color: '#9A7B35' }}>
+                      {esGrupo
+                        ? `${formatCOP(grupo[0].arriendo_actual)} + ${formatCOP(grupo[1].arriendo_actual)} = ${formatCOP(arriendoTotal)}`
+                        : formatCOP(principal.arriendo_actual)
+                      }
+                    </span>
+                    {' · '}Propietario: {(principal.propietarios as Propietario)?.nombre ?? 'Sin asignar'}
                   </p>
                   <p className="text-xs" style={{ color: 'oklch(0.560 0.012 68)' }}>
-                    {l.fecha_inicio_contrato
-                      ? `Contrato desde: ${new Date(l.fecha_inicio_contrato + 'T12:00:00').toLocaleDateString('es-CO')}`
+                    {principal.fecha_inicio_contrato
+                      ? `Contrato desde: ${new Date(principal.fecha_inicio_contrato + 'T12:00:00').toLocaleDateString('es-CO')}`
                       : 'Sin fecha de contrato'}
-                    {' · '}IPC +{l.puntos_incremento_ipc}pts
+                    {' · '}IPC +{principal.puntos_incremento_ipc}pts
                   </p>
                 </div>
                 <div className="flex gap-2 ml-3 flex-shrink-0">
-                  <Button variant="outline" size="sm" onClick={() => abrirHistorial(l)}>Historial</Button>
-                  <Button variant="outline" size="sm" onClick={() => { setIpcModal(l); setIpcPorcentaje('') }}>IPC</Button>
-                  <Button variant="outline" size="sm" onClick={() => abrirEditar(l)}>Editar</Button>
+                  {grupo.map(l => (
+                    <Button key={l.id} variant="outline" size="sm" onClick={() => abrirHistorial(l)}>
+                      {esGrupo ? `Hist. ${l.numero}` : 'Historial'}
+                    </Button>
+                  ))}
+                  <Button variant="outline" size="sm" onClick={() => { setIpcModal(principal); setIpcPorcentaje('') }}>IPC</Button>
+                  {grupo.map(l => (
+                    <Button key={l.id} variant="outline" size="sm" onClick={() => abrirEditar(l)}>
+                      {esGrupo ? `Editar ${l.numero}` : 'Editar'}
+                    </Button>
+                  ))}
                 </div>
               </div>
             </CardContent>
           </Card>
-        ))}
+            )
+          })
+        })()}
       </div>
 
       {/* Modal IPC */}

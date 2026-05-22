@@ -117,11 +117,22 @@ export default function InquilinosPage() {
                     <SelectValue placeholder="Seleccionar local" />
                   </SelectTrigger>
                   <SelectContent>
-                    {locales.map(l => (
-                      <SelectItem key={l.id} value={l.id}>
-                        {l.numero}{l.nombre ? ` — ${l.nombre}` : ''}
-                      </SelectItem>
-                    ))}
+                    {(() => {
+                      // Agrupar locales con el mismo nombre (ej: Makeno 305+401)
+                      const vistos = new Set<string>()
+                      return locales.flatMap(l => {
+                        if (vistos.has(l.id)) return []
+                        const hermanos = l.nombre ? locales.filter(x => x.nombre === l.nombre) : [l]
+                        hermanos.forEach(x => vistos.add(x.id))
+                        const label = hermanos.map(x => x.numero).join(' y ') + (l.nombre ? ` — ${l.nombre}` : '')
+                        // El value es el id del primero; para Makeno ambos locales quedan bajo este inquilino
+                        return [
+                          <SelectItem key={hermanos.map(x=>x.id).join('-')} value={l.id}>
+                            {label}
+                          </SelectItem>
+                        ]
+                      })
+                    })()}
                   </SelectContent>
                 </Select>
               </div>

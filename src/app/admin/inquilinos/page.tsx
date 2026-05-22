@@ -116,7 +116,7 @@ export default function InquilinosPage() {
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar local" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="w-[340px]">
                     {(() => {
                       // Agrupar locales con el mismo nombre (ej: Makeno 305+401)
                       const vistos = new Set<string>()

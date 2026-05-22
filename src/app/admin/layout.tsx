@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import { Logo } from '@/components/logo'
 import { SignOutButton } from '@/components/sign-out-button'
 import { NavLink } from '@/components/nav-link'
@@ -44,7 +47,7 @@ const navLinks = [
     label: 'Periodos',
     icon: (
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M4.5 1C4.77614 1 5 1.22386 5 1.5V2H10V1.5C10 1.22386 10.2239 1 10.5 1C10.7761 1 11 1.22386 11 1.5V2H12.5C13.3284 2 14 2.67157 14 3.5V12.5C14 13.3284 13.3284 14 12.5 14H2.5C1.67157 14 1 13.3284 1 12.5V3.5C1 2.67157 1.67157 2 2.5 2H4V1.5C4 1.22386 4.22386 1 4.5 1ZM10 3V3.5C10 3.77614 10.2239 4 10.5 4C10.7761 4 11 3.77614 11 3.5V3H12.5C12.7761 3 13 3.22386 13 3.5V5H2V3.5C2 3.22386 2.22386 3 2.5 3H4V3.5C4 3.77614 4.22386 4 4.5 4C4.77614 4 5 3.77614 5 3.5V3H10ZM2 6V12.5C2 12.7761 2.22386 13 2.5 13H12.5C12.7761 13 13 12.7761 13 12.5V6H2ZM7 7.5C7 7.22386 7.22386 7 7.5 7C7.77614 7 8 7.22386 8 7.5C8 7.77614 7.77614 8 7.5 8C7.22386 8 7 7.77614 7 7.5ZM9.5 7C9.22386 7 9 7.22386 9 7.5C9 7.77614 9.22386 8 9.5 8C9.77614 8 10 7.77614 10 7.5C10 7.22386 9.77614 7 9.5 7ZM11 7.5C11 7.22386 11.2239 7 11.5 7C11.7761 7 12 7.22386 12 7.5C12 7.77614 11.7761 8 11.5 8C11.2239 8 11 7.77614 11 7.5ZM11.5 9C11.2239 9 11 9.22386 11 9.5C11 9.77614 11.2239 10 11.5 10C11.7761 10 12 9.77614 12 9.5C12 9.22386 11.7761 9 11.5 9ZM9 9.5C9 9.22386 9.22386 9 9.5 9C9.77614 9 10 9.22386 10 9.5C10 9.77614 9.77614 10 9.5 10C9.22386 10 9 9.77614 9 9.5ZM7.5 9C7.22386 9 7 9.22386 7 9.5C7 9.77614 7.22386 10 7.5 10C7.77614 10 8 9.77614 8 9.5C8 9.22386 7.77614 9 7.5 9ZM3 9.5C3 9.22386 3.22386 9 3.5 9C3.77614 9 4 9.22386 4 9.5C4 9.77614 3.77614 10 3.5 10C3.22386 10 3 9.77614 3 9.5ZM5.5 9C5.22386 9 5 9.22386 5 9.5C5 9.77614 5.22386 10 5.5 10C5.77614 10 6 9.77614 6 9.5C6 9.22386 5.77614 9 5.5 9ZM3 11.5C3 11.2239 3.22386 11 3.5 11C3.77614 11 4 11.2239 4 11.5C4 11.7761 3.77614 12 3.5 12C3.22386 12 3 11.7761 3 11.5ZM5.5 11C5.22386 11 5 11.2239 5 11.5C5 11.7761 5.22386 12 5.5 12C5.77614 12 6 11.7761 6 11.5C6 11.2239 5.77614 11 5.5 11ZM7 11.5C7 11.2239 7.22386 11 7.5 11C7.77614 11 8 11.2239 8 11.5C8 11.7761 7.77614 12 7.5 12C7.22386 12 7 11.7761 7 11.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
+        <path d="M4.5 1C4.77614 1 5 1.22386 5 1.5V2H10V1.5C10 1.22386 10.2239 1 10.5 1C10.7761 1 11 1.22386 11 1.5V2H12.5C13.3284 2 14 2.67157 14 3.5V12.5C14 13.3284 13.3284 14 12.5 14H2.5C1.67157 14 1 13.3284 1 12.5V3.5C1 2.67157 1.67157 2 2.5 2H4V1.5C4 1.22386 4.22386 1 4.5 1ZM10 3V3.5C10 3.77614 10.2239 4 10.5 4C10.7761 4 11 3.77614 11 3.5V3H12.5C12.7761 3 13 3.22386 13 3.5V5H2V3.5C2 3.22386 2.22386 3 2.5 3H4V3.5C4 3.77614 4.22386 4 4.5 4C4.77614 4 5 3.77614 5 3.5V3H10ZM2 6V12.5C2 12.7761 2.22386 13 2.5 13H12.5C12.7761 13 13 12.7761 13 12.5V6H2Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
       </svg>
     ),
   },
@@ -53,7 +56,7 @@ const navLinks = [
     label: 'Lecturas',
     icon: (
       <svg width="15" height="15" viewBox="0 0 15 15" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M7.5 0C7.77614 0 8 0.223858 8 0.5V2.5C8 2.77614 7.77614 3 7.5 3C7.22386 3 7 2.77614 7 2.5V0.5C7 0.223858 7.22386 0 7.5 0ZM2.1967 2.1967C2.39196 2.00144 2.70854 2.00144 2.9038 2.1967L4.31802 3.61091C4.51328 3.80617 4.51328 4.12276 4.31802 4.31802C4.12276 4.51328 3.80617 4.51328 3.61091 4.31802L2.1967 2.9038C2.00144 2.70854 2.00144 2.39196 2.1967 2.1967ZM12.8033 2.1967C12.9986 2.39196 12.9986 2.70854 12.8033 2.9038L11.3891 4.31802C11.1938 4.51328 10.8772 4.51328 10.682 4.31802C10.4867 4.12276 10.4867 3.80617 10.682 3.61091L12.0962 2.1967C12.2915 2.00144 12.608 2.00144 12.8033 2.1967ZM0 7.5C0 7.22386 0.223858 7 0.5 7H2.5C2.77614 7 3 7.22386 3 7.5C3 7.77614 2.77614 8 2.5 8H0.5C0.223858 8 0 7.77614 0 7.5ZM12 7.5C12 7.22386 12.2239 7 12.5 7H14.5C14.7761 7 15 7.22386 15 7.5C15 7.77614 14.7761 8 14.5 8H12.5C12.2239 8 12 7.77614 12 7.5ZM7.5 4C5.567 4 4 5.567 4 7.5C4 8.88908 4.78555 10.0942 5.94993 10.7074L5.94993 12.5C5.94993 12.7761 6.17379 13 6.44993 13H8.54993C8.82607 13 9.04993 12.7761 9.04993 12.5V10.7074C10.2143 10.0942 10.9999 8.88908 10.9999 7.5C10.9999 5.567 9.43294 4 7.5 4ZM5 7.5C5 6.11929 6.11929 5 7.5 5C8.88071 5 10 6.11929 10 7.5C10 8.55436 9.36918 9.45944 8.45905 9.87687C8.22012 9.98543 8.04993 10.2265 8.04993 10.49V12H6.94993V10.49C6.94993 10.2265 6.77974 9.98543 6.54081 9.87687C5.63068 9.45944 5 8.55436 5 7.5ZM4.31802 10.682C4.51328 10.8772 4.51328 11.1938 4.31802 11.3891L2.9038 12.8033C2.70854 12.9986 2.39196 12.9986 2.1967 12.8033C2.00144 12.608 2.00144 12.2915 2.1967 12.0962L3.61091 10.682C3.80617 10.4867 4.12276 10.4867 4.31802 10.682Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
+        <path d="M7.5 0C7.77614 0 8 0.223858 8 0.5V2.5C8 2.77614 7.77614 3 7.5 3C7.22386 3 7 2.77614 7 2.5V0.5C7 0.223858 7.22386 0 7.5 0ZM7.5 4C5.567 4 4 5.567 4 7.5C4 8.889 4.786 10.094 5.95 10.707V12.5C5.95 12.776 6.174 13 6.45 13H8.55C8.826 13 9.05 12.776 9.05 12.5V10.707C10.214 10.094 11 8.889 11 7.5C11 5.567 9.433 4 7.5 4Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
       </svg>
     ),
   },
@@ -69,46 +72,94 @@ const navLinks = [
 ]
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  const SidebarContent = () => (
+    <>
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'oklch(0.520 0.015 60)', letterSpacing: '0.12em' }}>
+          Administración
+        </p>
+        {navLinks.map(link => (
+          <div key={link.href} onClick={() => setMobileOpen(false)}>
+            <NavLink href={link.href} icon={link.icon} label={link.label} />
+          </div>
+        ))}
+      </nav>
+      <div className="px-3 py-4 border-t space-y-1" style={{ borderColor: 'oklch(0.880 0.012 72)' }}>
+        <p className="px-3 text-[10px]" style={{ color: 'oklch(0.600 0.012 72)' }}>Cra. 37 #10-37, Medellín</p>
+        <SignOutButton />
+      </div>
+    </>
+  )
+
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: 'oklch(0.970 0.010 75)' }}>
-      {/* Sidebar */}
+
+      {/* ── Desktop sidebar ── */}
       <aside
-        className="w-56 flex-shrink-0 flex flex-col border-r"
+        className="hidden lg:flex w-56 flex-shrink-0 flex-col border-r"
         style={{ backgroundColor: '#FFFFFF', borderColor: 'oklch(0.880 0.012 72)' }}
       >
-        {/* Logo area */}
         <div className="px-5 py-5 border-b" style={{ borderColor: 'oklch(0.880 0.012 72)' }}>
           <Logo size="sm" variant="dark" />
         </div>
-
-        {/* Nav section */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5">
-          <p
-            className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest"
-            style={{ color: 'oklch(0.520 0.015 60)', letterSpacing: '0.12em' }}
-          >
-            Administración
-          </p>
-          {navLinks.map(link => (
-            <NavLink key={link.href} href={link.href} icon={link.icon} label={link.label} />
-          ))}
-        </nav>
-
-        {/* Bottom: address + sign out */}
-        <div className="px-3 py-4 border-t space-y-1" style={{ borderColor: 'oklch(0.880 0.012 72)' }}>
-          <p className="px-3 text-[10px]" style={{ color: 'oklch(0.600 0.012 72)' }}>
-            Cra. 37 #10-37, Medellín
-          </p>
-          <SignOutButton />
-        </div>
+        <SidebarContent />
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 flex flex-col min-w-0">
-        <div className="flex-1 p-8 max-w-5xl">
-          {children}
+      {/* ── Mobile overlay ── */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{ backgroundColor: 'rgba(0,0,0,0.4)' }}
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* ── Mobile drawer ── */}
+      <aside
+        className={`fixed top-0 left-0 h-full z-50 flex flex-col w-64 border-r transition-transform duration-200 lg:hidden ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ backgroundColor: '#FFFFFF', borderColor: 'oklch(0.880 0.012 72)' }}
+      >
+        <div className="px-5 py-5 border-b flex items-center justify-between" style={{ borderColor: 'oklch(0.880 0.012 72)' }}>
+          <Logo size="sm" variant="dark" />
+          <button
+            onClick={() => setMobileOpen(false)}
+            className="p-1 rounded"
+            style={{ color: 'oklch(0.520 0.015 60)' }}
+          >
+            <svg width="16" height="16" viewBox="0 0 15 15" fill="none">
+              <path d="M11.7816 4.03157C12.0062 3.80702 12.0062 3.44295 11.7816 3.2184C11.5571 2.99385 11.193 2.99385 10.9685 3.2184L7.50005 6.68682L4.03164 3.2184C3.80708 2.99385 3.44301 2.99385 3.21846 3.2184C2.99391 3.44295 2.99391 3.80702 3.21846 4.03157L6.68688 7.49999L3.21846 10.9684C2.99391 11.193 2.99391 11.557 3.21846 11.7816C3.44301 12.0061 3.80708 12.0061 4.03164 11.7816L7.50005 8.31316L10.9685 11.7816C11.193 12.0061 11.5571 12.0061 11.7816 11.7816C12.0062 11.557 12.0062 11.193 11.7816 10.9684L8.31322 7.49999L11.7816 4.03157Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
+            </svg>
+          </button>
         </div>
-      </main>
+        <SidebarContent />
+      </aside>
+
+      {/* ── Main content ── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile top bar */}
+        <header
+          className="lg:hidden flex items-center justify-between px-4 py-3 border-b sticky top-0 z-30"
+          style={{ backgroundColor: '#FFFFFF', borderColor: 'oklch(0.880 0.012 72)' }}
+        >
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-2 rounded-md"
+            style={{ color: 'oklch(0.300 0.018 58)' }}
+          >
+            <svg width="18" height="18" viewBox="0 0 15 15" fill="none">
+              <path d="M1.5 3C1.22386 3 1 3.22386 1 3.5C1 3.77614 1.22386 4 1.5 4H13.5C13.7761 4 14 3.77614 14 3.5C14 3.22386 13.7761 3 13.5 3H1.5ZM1 7.5C1 7.22386 1.22386 7 1.5 7H13.5C13.7761 7 14 7.22386 14 7.5C14 7.77614 13.7761 8 13.5 8H1.5C1.22386 8 1 7.77614 1 7.5ZM1 11.5C1 11.2239 1.22386 11 1.5 11H13.5C13.7761 11 14 11.2239 14 11.5C14 11.7761 13.7761 12 13.5 12H1.5C1.22386 12 1 11.7761 1 11.5Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd" />
+            </svg>
+          </button>
+          <Logo size="sm" variant="dark" />
+          <div className="w-8" />
+        </header>
+
+        <main className="flex-1 p-4 md:p-8 max-w-5xl w-full">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }

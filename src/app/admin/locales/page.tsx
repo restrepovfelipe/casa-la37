@@ -120,7 +120,7 @@ export default function LocalesPage() {
               </div>
               <div>
                 <Label>Propietario asignado</Label>
-                <Select value={form.propietario_id} onValueChange={v => setForm({ ...form, propietario_id: v })}>
+                <Select value={form.propietario_id} onValueChange={v => setForm({ ...form, propietario_id: v ?? '' })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar propietario" />
                   </SelectTrigger>

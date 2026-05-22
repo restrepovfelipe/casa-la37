@@ -83,7 +83,7 @@ export default function PeriodosPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Mes</Label>
-                  <Select value={form.mes} onValueChange={v => setForm({ ...form, mes: v })}>
+                  <Select value={form.mes} onValueChange={v => setForm({ ...form, mes: v ?? '' })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {MESES.map((m, i) => (

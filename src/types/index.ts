@@ -88,6 +88,8 @@ export type Factura = {
   total: number
   estado_servicios: 'pendiente' | 'pagado'
   estado_arriendo: 'pendiente' | 'pagado'
+  fecha_pago_servicios: string | null
+  fecha_pago_arriendo: string | null
   bold_link_servicios: string | null
   observaciones: string | null
   created_at: string

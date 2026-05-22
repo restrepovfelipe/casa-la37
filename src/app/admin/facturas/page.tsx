@@ -165,7 +165,7 @@ export default function FacturasPage() {
                 <p className="text-lg font-bold">{formatCOP(facturas.reduce((s, f) => s + f.agua_total + f.luz_total, 0))}</p>
               </CardContent></Card>
               <Card><CardContent className="pt-4">
-                <p className="text-xs text-gray-500">Telesentinel + Empleada</p>
+                <p className="text-xs text-gray-500">Alarmar + Empleada</p>
                 <p className="text-lg font-bold">{formatCOP((periodo?.telesentinel ?? 0) + (periodo?.empleada ?? 0))}</p>
               </CardContent></Card>
             </div>

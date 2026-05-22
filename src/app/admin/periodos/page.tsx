@@ -98,7 +98,7 @@ export default function PeriodosPage() {
                 </div>
               </div>
               <div>
-                <Label>Telesentinel ($)</Label>
+                <Label>Alarmar ($)</Label>
                 <Input type="number" placeholder="89000" value={form.telesentinel} onChange={e => setForm({ ...form, telesentinel: e.target.value })} />
               </div>
               <div>
@@ -130,7 +130,7 @@ export default function PeriodosPage() {
                   <Badge variant={estadoColor[p.estado]}>{p.estado}</Badge>
                 </div>
                 <p className="text-sm text-gray-500">
-                  Telesentinel: {formatCOP(p.telesentinel)} · Empleada: {formatCOP(p.empleada)}
+                  Alarmar: {formatCOP(p.telesentinel)} · Empleada: {formatCOP(p.empleada)}
                   {p.fecha_limite_pago && ` · Límite: ${new Date(p.fecha_limite_pago).toLocaleDateString('es-CO')}`}
                 </p>
               </div>

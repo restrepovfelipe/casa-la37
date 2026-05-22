@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -24,6 +24,11 @@ export async function proxy(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   const path = request.nextUrl.pathname
 
+  // Auth callback routes — always allow through
+  if (path.startsWith('/auth')) {
+    return supabaseResponse
+  }
+
   if (!user && path !== '/login') {
     return NextResponse.redirect(new URL('/login', request.url))
   }
@@ -33,9 +38,9 @@ export async function proxy(request: NextRequest) {
       .from('profiles')
       .select('rol')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
-    if (path === '/login') {
+    if (path === '/login' || path === '/') {
       return NextResponse.redirect(
         new URL(profile?.rol === 'admin' ? '/admin/dashboard' : '/mi-factura', request.url)
       )

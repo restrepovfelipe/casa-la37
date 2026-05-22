@@ -100,7 +100,7 @@ export default function LocalesPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Locales</h1>
         <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
+          <DialogTrigger>
             <Button onClick={abrirNuevo}>+ Agregar local</Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">

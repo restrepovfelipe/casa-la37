@@ -32,7 +32,7 @@ export default function LocalesPage() {
   const [loading, setLoading] = useState(false)
 
   // IPC
-  const [ipcModal, setIpcModal] = useState<Local | null>(null)
+  const [ipcModal, setIpcModal] = useState<Local[] | null>(null)
   const [ipcPorcentaje, setIpcPorcentaje] = useState('')
 
   // Historial
@@ -81,10 +81,16 @@ export default function LocalesPage() {
   async function aplicarIPC() {
     if (!ipcModal) return
     const ipc = parseFloat(ipcPorcentaje) || 0
-    const total = ipc + ipcModal.puntos_incremento_ipc
-    const nuevo = Math.round(ipcModal.arriendo_actual * (1 + total / 100))
-    if (!confirm(`¿Aplicar incremento del ${total}%?\nNuevo arriendo: ${formatCOP(nuevo)}`)) return
-    await supabase.from('locales').update({ arriendo_actual: nuevo }).eq('id', ipcModal.id)
+    const resumen = ipcModal.map(l => {
+      const total = ipc + l.puntos_incremento_ipc
+      const nuevo = Math.round(l.arriendo_actual * (1 + total / 100))
+      return { local: l, nuevo, total }
+    })
+    const msg = resumen.map(r => `${r.local.numero}: ${formatCOP(r.nuevo)} (+${r.total}%)`).join('\n')
+    if (!confirm(`¿Aplicar nuevos arriendos?\n${msg}`)) return
+    await Promise.all(resumen.map(r =>
+      supabase.from('locales').update({ arriendo_actual: r.nuevo }).eq('id', r.local.id)
+    ))
     await cargar(); setIpcModal(null)
   }
 
@@ -101,9 +107,11 @@ export default function LocalesPage() {
   const formatCOP = (n: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
 
-  const ipcNuevoArriendo = ipcModal
-    ? Math.round(ipcModal.arriendo_actual * (1 + ((parseFloat(ipcPorcentaje) || 0) + ipcModal.puntos_incremento_ipc) / 100))
-    : 0
+  const ipcResumen = ipcModal?.map(l => ({
+    local: l,
+    total: (parseFloat(ipcPorcentaje) || 0) + l.puntos_incremento_ipc,
+    nuevo: Math.round(l.arriendo_actual * (1 + ((parseFloat(ipcPorcentaje) || 0) + l.puntos_incremento_ipc) / 100)),
+  })) ?? []
 
   return (
     <div>
@@ -221,7 +229,7 @@ export default function LocalesPage() {
                       {esGrupo ? `Hist. ${l.numero}` : 'Historial'}
                     </Button>
                   ))}
-                  <Button variant="outline" size="sm" onClick={() => { setIpcModal(principal); setIpcPorcentaje('') }}>IPC</Button>
+                  <Button variant="outline" size="sm" onClick={() => { setIpcModal(grupo); setIpcPorcentaje('') }}>IPC</Button>
                   {grupo.map(l => (
                     <Button key={l.id} variant="outline" size="sm" onClick={() => abrirEditar(l)}>
                       {esGrupo ? `Editar ${l.numero}` : 'Editar'}
@@ -244,16 +252,19 @@ export default function LocalesPage() {
           </DialogHeader>
           {ipcModal && (
             <div className="space-y-4">
-              <div className="rounded-lg p-4" style={{ backgroundColor: 'oklch(0.945 0.012 72)' }}>
-                <p className="font-medium text-sm mb-1" style={{ color: 'oklch(0.185 0.020 55)' }}>
-                  {ipcModal.numero}{ipcModal.nombre ? ` — ${ipcModal.nombre}` : ''}
-                </p>
-                <p className="text-sm" style={{ color: 'oklch(0.520 0.015 60)' }}>
-                  Arriendo actual: <span className="font-semibold" style={{ color: '#9A7B35' }}>{formatCOP(ipcModal.arriendo_actual)}</span>
-                </p>
-                <p className="text-xs mt-1" style={{ color: 'oklch(0.560 0.012 68)' }}>
-                  Puntos adicionales pactados en contrato: +{ipcModal.puntos_incremento_ipc}%
-                </p>
+              {/* Un bloque por cada local del grupo */}
+              <div className="space-y-2">
+                {ipcModal.map(l => (
+                  <div key={l.id} className="rounded-lg p-3" style={{ backgroundColor: 'oklch(0.945 0.012 72)' }}>
+                    <p className="font-medium text-sm" style={{ color: 'oklch(0.185 0.020 55)' }}>
+                      {l.numero}{l.nombre ? ` — ${l.nombre}` : ''}
+                    </p>
+                    <p className="text-sm" style={{ color: 'oklch(0.520 0.015 60)' }}>
+                      Arriendo actual: <span className="font-semibold" style={{ color: '#9A7B35' }}>{formatCOP(l.arriendo_actual)}</span>
+                      {' · '}+{l.puntos_incremento_ipc}pts
+                    </p>
+                  </div>
+                ))}
               </div>
               <div>
                 <Label>IPC oficial del año (%)</Label>
@@ -266,21 +277,25 @@ export default function LocalesPage() {
                   Consultable en dane.gov.co
                 </p>
               </div>
-              {ipcPorcentaje && (
-                <div className="rounded-lg p-4 border" style={{ borderColor: 'oklch(0.880 0.060 68)', backgroundColor: 'oklch(0.970 0.040 60)' }}>
-                  <p className="text-xs mb-2" style={{ color: 'oklch(0.520 0.015 60)' }}>
-                    IPC {ipcPorcentaje}% + {ipcModal.puntos_incremento_ipc}pts = <strong>{(parseFloat(ipcPorcentaje) || 0) + ipcModal.puntos_incremento_ipc}%</strong> de incremento
-                  </p>
-                  <p className="text-xl font-semibold" style={{ color: 'oklch(0.185 0.020 55)' }}>
-                    Nuevo arriendo: <span style={{ color: '#9A7B35' }}>{formatCOP(ipcNuevoArriendo)}</span>
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: 'oklch(0.560 0.012 68)' }}>
-                    +{formatCOP(ipcNuevoArriendo - ipcModal.arriendo_actual)} más que el actual
-                  </p>
+              {ipcPorcentaje && ipcResumen.length > 0 && (
+                <div className="rounded-lg p-4 border space-y-2" style={{ borderColor: 'oklch(0.880 0.060 68)', backgroundColor: 'oklch(0.970 0.040 60)' }}>
+                  {ipcResumen.map(r => (
+                    <div key={r.local.id}>
+                      <p className="text-xs" style={{ color: 'oklch(0.520 0.015 60)' }}>
+                        {r.local.numero} · IPC {ipcPorcentaje}% + {r.local.puntos_incremento_ipc}pts = <strong>{r.total}%</strong>
+                      </p>
+                      <p className="text-base font-semibold" style={{ color: 'oklch(0.185 0.020 55)' }}>
+                        Nuevo arriendo: <span style={{ color: '#9A7B35' }}>{formatCOP(r.nuevo)}</span>
+                        <span className="text-xs font-normal ml-2" style={{ color: 'oklch(0.560 0.012 68)' }}>
+                          (+{formatCOP(r.nuevo - r.local.arriendo_actual)})
+                        </span>
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
               <Button className="w-full" onClick={aplicarIPC} disabled={!ipcPorcentaje}>
-                Aplicar nuevo arriendo
+                Aplicar {ipcModal.length > 1 ? 'a los 2 locales' : 'nuevo arriendo'}
               </Button>
             </div>
           )}

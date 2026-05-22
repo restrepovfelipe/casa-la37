@@ -120,7 +120,7 @@ export default function FacturasPage() {
 
       <div className="mb-6 max-w-xs">
         <Label>Seleccionar periodo</Label>
-        <Select value={periodoId} onValueChange={setPeriodoId}>
+        <Select value={periodoId} onValueChange={(v) => setPeriodoId(v ?? '')}>
           <SelectTrigger><SelectValue placeholder="Seleccionar periodo..." /></SelectTrigger>
           <SelectContent>
             {periodos.map(p => (

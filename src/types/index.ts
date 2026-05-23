@@ -91,6 +91,8 @@ export type Factura = {
   fecha_pago_servicios: string | null
   fecha_pago_arriendo: string | null
   bold_link_servicios: string | null
+  link_pago_servicios: string | null
+  link_pago_arriendo: string | null
   observaciones: string | null
   created_at: string
   locales?: Local

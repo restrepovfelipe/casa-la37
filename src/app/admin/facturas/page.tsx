@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 function compartirWhatsApp(factura: Factura & { locales: Local; periodos: Periodo }, formatCOP: (n: number) => string, telefono?: string | null) {
@@ -142,6 +143,11 @@ export default function FacturasPage() {
   const [inquilinos, setInquilinos] = useState<{ local_id: string | null; telefono: string | null }[]>([])
   const [generando, setGenerando] = useState(false)
   const [notasModal, setNotasModal] = useState<{ facturaId: string; texto: string } | null>(null)
+  const [linksModal, setLinksModal] = useState<{
+    facturaId: string
+    link_servicios: string
+    link_arriendo: string
+  } | null>(null)
   const supabase = createClient()
 
   const hoy = new Date()
@@ -220,6 +226,15 @@ export default function FacturasPage() {
     await supabase.from('facturas').update({ observaciones: texto }).eq('id', facturaId)
     await cargarFacturas()
     setNotasModal(null)
+  }
+
+  async function guardarLinks(facturaId: string, link_servicios: string, link_arriendo: string) {
+    await supabase.from('facturas').update({
+      link_pago_servicios: link_servicios || null,
+      link_pago_arriendo: link_arriendo || null,
+    }).eq('id', facturaId)
+    await cargarFacturas()
+    setLinksModal(null)
   }
 
   const formatCOP = (n: number) =>
@@ -359,6 +374,25 @@ export default function FacturasPage() {
                           </svg>
                           WhatsApp
                         </button>
+                        {/* Links de pago */}
+                        <button
+                          onClick={() => setLinksModal({
+                            facturaId: f.id,
+                            link_servicios: f.link_pago_servicios ?? '',
+                            link_arriendo: f.link_pago_arriendo ?? '',
+                          })}
+                          className="text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1"
+                          style={{
+                            borderColor: (f.link_pago_servicios || f.link_pago_arriendo) ? '#2563eb' : 'oklch(0.880 0.012 72)',
+                            color: (f.link_pago_servicios || f.link_pago_arriendo) ? '#2563eb' : 'oklch(0.520 0.015 60)',
+                          }}
+                          title="Links de pago para el inquilino"
+                        >
+                          <svg width="11" height="11" viewBox="0 0 15 15" fill="none">
+                            <path d="M8.51194 3.00541C9.18829 2.54594 10.0435 2.53694 10.6788 2.95419C10.8231 3.04893 10.9771 3.1993 11.389 3.61119C11.8009 4.02307 11.9513 4.17714 12.046 4.32141C12.4633 4.95675 12.4543 5.81192 11.9948 6.48827C11.8899 6.64264 11.7276 6.80834 11.3006 7.23548L10.6819 7.85414C10.4867 8.04936 10.4867 8.36595 10.6819 8.56117C10.8772 8.7564 11.1938 8.7564 11.389 8.56117L12.0077 7.94251C12.4358 7.51452 12.6394 7.31017 12.7998 7.0768C13.4922 6.06168 13.5087 4.76259 12.8422 3.7302C12.6849 3.49166 12.4748 3.28165 12.0961 2.90295C11.7174 2.52426 11.5074 2.31425 11.2688 2.15692C10.2364 1.49036 8.93734 1.50687 7.92222 2.19922C7.68885 2.35963 7.48445 2.56322 7.0565 2.99117L6.43784 3.60983C6.24261 3.80505 6.24261 4.12164 6.43784 4.31686C6.63306 4.51208 6.94965 4.51208 7.14487 4.31686L7.76353 3.6982C8.19062 3.27111 8.35761 3.10879 8.51194 3.00541ZM4.31686 6.43784C4.51208 6.24261 4.51208 5.92603 4.31686 5.73081C4.12164 5.53558 3.80505 5.53558 3.60983 5.73081L2.99117 6.34947C2.56322 6.77742 2.35963 6.98181 2.19922 7.21518C1.50687 8.2303 1.49036 9.52939 2.15692 10.5618C2.31425 10.8003 2.52426 11.0104 2.90295 11.3891C3.28165 11.7678 3.49166 11.9778 3.7302 12.1351C4.76259 12.8017 6.06168 12.7852 7.0768 12.0928C7.31017 11.9324 7.51452 11.7288 7.94251 11.3008L8.56117 10.682C8.7564 10.4868 8.7564 10.1702 8.56117 9.97499C8.36595 9.77977 8.04936 9.77977 7.85414 9.97499L7.23548 10.5937C6.80834 11.0208 6.64264 11.1831 6.48827 11.2879C5.81192 11.7474 4.95675 11.7564 4.32141 11.3391C4.17714 11.2444 4.02307 11.094 3.61119 10.6821C3.1993 10.2702 3.04893 10.1162 2.95419 9.97191C2.53694 9.33657 2.54594 8.48141 3.00541 7.80506C3.10879 7.65073 3.27111 7.48374 3.6982 7.05665L4.31686 6.43784ZM9.62172 6.08492C9.81694 5.88969 9.81694 5.57311 9.62172 5.37789C9.42649 5.18266 9.10991 5.18266 8.91469 5.37789L5.37789 8.91469C5.18266 9.10991 5.18266 9.42649 5.37789 9.62172C5.57311 9.81694 5.88969 9.81694 6.08492 9.62172L9.62172 6.08492Z" fill="currentColor" fillRule="evenodd" clipRule="evenodd"/>
+                          </svg>
+                          Links
+                        </button>
                         {/* Imprimir */}
                         <button
                           onClick={() => imprimir(f as Factura & { locales: Local; periodos: Periodo }, formatCOP)}
@@ -493,6 +527,48 @@ export default function FacturasPage() {
           )}
         </>
       )}
+
+      {/* Modal de links de pago */}
+      <Dialog open={!!linksModal} onOpenChange={() => setLinksModal(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Links de pago</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs" style={{ color: 'oklch(0.520 0.015 60)' }}>
+            Pega los links de pago (Bold, Nequi, Bancolombia, etc.). El inquilino verá botones de pago directo en su portal.
+          </p>
+          <div className="space-y-3">
+            <div>
+              <Label>Link para pagar servicios</Label>
+              <p className="text-xs mb-1" style={{ color: 'oklch(0.560 0.012 68)' }}>
+                Cuenta compartida de servicios comunes
+              </p>
+              <Input
+                placeholder="https://cobro.bold.co/... o link de Nequi"
+                value={linksModal?.link_servicios ?? ''}
+                onChange={e => setLinksModal(prev => prev ? { ...prev, link_servicios: e.target.value } : null)}
+              />
+            </div>
+            <div>
+              <Label>Link para pagar arriendo</Label>
+              <p className="text-xs mb-1" style={{ color: 'oklch(0.560 0.012 68)' }}>
+                Cuenta del propietario del local
+              </p>
+              <Input
+                placeholder="https://cobro.bold.co/... o link de Nequi"
+                value={linksModal?.link_arriendo ?? ''}
+                onChange={e => setLinksModal(prev => prev ? { ...prev, link_arriendo: e.target.value } : null)}
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => linksModal && guardarLinks(linksModal.facturaId, linksModal.link_servicios, linksModal.link_arriendo)}
+            >
+              Guardar links
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de notas */}
       <Dialog open={!!notasModal} onOpenChange={() => setNotasModal(null)}>

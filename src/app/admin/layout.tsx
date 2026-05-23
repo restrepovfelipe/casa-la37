@@ -85,8 +85,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const SidebarContent = () => (
     <>
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'oklch(0.520 0.015 60)', letterSpacing: '0.12em' }}>
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+        <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'oklch(0.520 0.015 60)', letterSpacing: '0.12em' }}>
           Administración
         </p>
         {navLinks.map(link => (

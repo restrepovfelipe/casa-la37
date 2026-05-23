@@ -94,10 +94,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <NavLink href={link.href} icon={link.icon} label={link.label} />
           </div>
         ))}
+        <div className="pt-1" onClick={() => setMobileOpen(false)}>
+          <SignOutButton />
+        </div>
       </nav>
-      <div className="px-3 py-4 border-t space-y-1" style={{ borderColor: 'oklch(0.880 0.012 72)' }}>
+      <div className="px-3 py-3 border-t" style={{ borderColor: 'oklch(0.880 0.012 72)' }}>
         <p className="px-3 text-[10px]" style={{ color: 'oklch(0.600 0.012 72)' }}>Cra. 37 #10-37, Medellín</p>
-        <SignOutButton />
       </div>
     </>
   )

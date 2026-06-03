@@ -195,14 +195,14 @@ export default function LocalesPage() {
             return (
           <Card key={grupo.map(x=>x.id).join('-')}>
             <CardContent className="pt-4">
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-3">
                 <div className="space-y-1 flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium" style={{ color: 'oklch(0.185 0.020 55)' }}>
                       {numerosLabel}{principal.nombre ? ` — ${principal.nombre}` : ''}
                     </p>
                     {esGrupo && (
-                      <Badge variant="secondary" className="text-xs">2 locales</Badge>
+                      <Badge variant="secondary" className="text-xs">{grupo.length} locales</Badge>
                     )}
                     {grupo.every(x => !x.activo) && <Badge variant="secondary">Inactivo</Badge>}
                   </div>
@@ -210,7 +210,7 @@ export default function LocalesPage() {
                     Arriendo:{' '}
                     <span className="font-semibold" style={{ color: '#9A7B35' }}>
                       {esGrupo
-                        ? `${formatCOP(grupo[0].arriendo_actual)} + ${formatCOP(grupo[1].arriendo_actual)} = ${formatCOP(arriendoTotal)}`
+                        ? `${grupo.map(x => formatCOP(x.arriendo_actual)).join(' + ')} = ${formatCOP(arriendoTotal)}`
                         : formatCOP(principal.arriendo_actual)
                       }
                     </span>
@@ -223,18 +223,25 @@ export default function LocalesPage() {
                     {' · '}IPC +{principal.puntos_incremento_ipc}pts
                   </p>
                 </div>
-                <div className="flex gap-2 ml-3 flex-shrink-0">
-                  {grupo.map(l => (
-                    <Button key={l.id} variant="outline" size="sm" onClick={() => abrirHistorial(l)}>
-                      {esGrupo ? `Hist. ${l.numero}` : 'Historial'}
-                    </Button>
-                  ))}
-                  <Button variant="outline" size="sm" onClick={() => { setIpcModal(grupo); setIpcPorcentaje('') }}>IPC</Button>
-                  {grupo.map(l => (
-                    <Button key={l.id} variant="outline" size="sm" onClick={() => abrirEditar(l)}>
-                      {esGrupo ? `Editar ${l.numero}` : 'Editar'}
-                    </Button>
-                  ))}
+                {/* Botones — se reorganizan en filas si hay muchos */}
+                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                  <div className="flex gap-1.5 flex-wrap justify-end">
+                    <Button variant="outline" size="sm" onClick={() => { setIpcModal(grupo); setIpcPorcentaje('') }}>IPC</Button>
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap justify-end">
+                    {grupo.map(l => (
+                      <Button key={l.id} variant="outline" size="sm" onClick={() => abrirHistorial(l)}>
+                        {esGrupo ? `Hist. ${l.numero}` : 'Historial'}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap justify-end">
+                    {grupo.map(l => (
+                      <Button key={l.id} variant="outline" size="sm" onClick={() => abrirEditar(l)}>
+                        {esGrupo ? `Editar ${l.numero}` : 'Editar'}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -295,7 +302,7 @@ export default function LocalesPage() {
                 </div>
               )}
               <Button className="w-full" onClick={aplicarIPC} disabled={!ipcPorcentaje}>
-                Aplicar {ipcModal.length > 1 ? 'a los 2 locales' : 'nuevo arriendo'}
+                Aplicar {ipcModal.length > 1 ? `a los ${ipcModal.length} locales` : 'nuevo arriendo'}
               </Button>
             </div>
           )}

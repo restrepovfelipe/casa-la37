@@ -21,6 +21,7 @@ export default function DistribucionPage() {
   // Modal ingreso extra
   const [ingModal, setIngModal] = useState<{ id?: string; descripcion: string; monto: string } | null>(null)
   const [savingIng, setSavingIng] = useState(false)
+  const [calculandoHonorarios, setCalculandoHonorarios] = useState(false)
 
   const supabase = createClient()
 
@@ -68,6 +69,30 @@ export default function DistribucionPage() {
     await cargarDatos()
     setIngModal(null)
     setSavingIng(false)
+  }
+
+  async function calcularHonorarios() {
+    setCalculandoHonorarios(true)
+    // Base de cálculo: arriendos + ingresos extraordinarios del periodo
+    const base = facturas.reduce((s, f) => s + f.arriendo, 0)
+      + ingresos.reduce((s, i) => s + i.monto, 0)
+    const monto = Math.round(base * 0.10)
+
+    // Busca si ya existe un gasto de honorarios admin para este periodo
+    const existente = gastos.find(g => g.categoria === 'admin' && g.descripcion.toLowerCase().includes('honorarios'))
+
+    if (existente) {
+      await supabase.from('gastos').update({ monto, descripcion: 'Honorarios administración (10%)' }).eq('id', existente.id)
+    } else {
+      await supabase.from('gastos').insert({
+        periodo_id: periodoId,
+        descripcion: 'Honorarios administración (10%)',
+        monto,
+        categoria: 'admin',
+      })
+    }
+    await cargarDatos()
+    setCalculandoHonorarios(false)
   }
 
   async function eliminarIngreso(id: string) {
@@ -222,19 +247,48 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
           </div>
 
           {/* Banner honorarios administración */}
-          {honorariosAdmin > 0 && (
-            <div className="rounded-xl border px-4 py-3 mb-6 flex items-start gap-3"
+          {honorariosAdmin > 0 ? (
+            <div className="rounded-xl border px-4 py-3 mb-6 flex items-center justify-between gap-3"
               style={{ backgroundColor: 'oklch(0.975 0.025 80)', borderColor: 'oklch(0.860 0.060 80)' }}>
-              <span className="text-lg mt-0.5">🏛️</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold" style={{ color: 'oklch(0.450 0.100 65)' }}>
-                  Honorarios de administración (10%): {formatCOP(honorariosAdmin)}
+              <div className="flex items-start gap-3 flex-1">
+                <span className="text-lg mt-0.5">🏛️</span>
+                <div>
+                  <p className="text-sm font-semibold" style={{ color: 'oklch(0.450 0.100 65)' }}>
+                    Honorarios de administración (10%): {formatCOP(honorariosAdmin)}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'oklch(0.560 0.060 65)' }}>
+                    Se pagan <strong>primero</strong> a la administradora. Pool para reparto por propiedad: <strong>{formatCOP(poolPropietarios)}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={calcularHonorarios}
+                disabled={calculandoHonorarios}
+                className="text-xs px-3 py-1.5 rounded-lg border flex-shrink-0"
+                style={{ borderColor: 'oklch(0.700 0.100 75)', color: 'oklch(0.450 0.100 65)', backgroundColor: '#fff' }}
+              >
+                {calculandoHonorarios ? 'Calculando...' : 'Recalcular'}
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed px-4 py-3 mb-6 flex items-center justify-between gap-3"
+              style={{ borderColor: 'oklch(0.800 0.060 80)', backgroundColor: 'oklch(0.988 0.012 80)' }}>
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'oklch(0.450 0.100 65)' }}>
+                  Honorarios de administración (10%) no calculados
                 </p>
                 <p className="text-xs mt-0.5" style={{ color: 'oklch(0.560 0.060 65)' }}>
-                  Este monto se paga <strong>primero</strong> a la administradora, antes de repartir.
-                  Pool para distribución por propiedad: <strong>{formatCOP(poolPropietarios)}</strong>
+                  Base: arriendos + ingresos extra = <strong>{formatCOP(totalArriendos + totalIngresosExtra)}</strong> → 10% = <strong>{formatCOP(Math.round((totalArriendos + totalIngresosExtra) * 0.10))}</strong>
                 </p>
               </div>
+              <button
+                onClick={calcularHonorarios}
+                disabled={calculandoHonorarios || facturas.length === 0}
+                className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0 font-medium"
+                style={{ backgroundColor: 'oklch(0.700 0.100 75)', color: '#fff' }}
+              >
+                {calculandoHonorarios ? 'Calculando...' : '+ Calcular honorarios'}
+              </button>
             </div>
           )}
 

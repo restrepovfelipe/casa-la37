@@ -112,6 +112,14 @@ export type Gasto = {
   created_at: string
 }
 
+export type IngresoExtra = {
+  id: string
+  periodo_id: string
+  descripcion: string
+  monto: number
+  created_at: string
+}
+
 export const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'

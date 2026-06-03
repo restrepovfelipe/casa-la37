@@ -203,7 +203,12 @@ export default function FacturasPage() {
 
   async function generarFacturas() {
     setGenerando(true)
-    const { data: lects } = await supabase.from('lecturas').select('*').eq('periodo_id', periodoId)
+    const [{ data: lects }, { data: existentes }] = await Promise.all([
+      supabase.from('lecturas').select('*').eq('periodo_id', periodoId),
+      supabase.from('facturas')
+        .select('local_id, estado_servicios, estado_arriendo, fecha_pago_servicios, fecha_pago_arriendo')
+        .eq('periodo_id', periodoId),
+    ])
     const localesConAlarma = locales.filter(l => localPagaAlarmar(l.numero))
     const alarmaXLocal = localesConAlarma.length > 0
       ? (periodo?.telesentinel ?? 0) / localesConAlarma.length
@@ -219,6 +224,8 @@ export default function FacturasPage() {
       const alarma = localPagaAlarmar(local.numero) ? alarmaXLocal : 0
       const totalServicios = agua + luz + alarma + empleadaXLocal
       const retencion = Math.round(local.arriendo_actual * (local.retencion_pct ?? 0) / 100)
+      // Preservar el estado de pago existente al recalcular
+      const existente = existentes?.find(e => e.local_id === local.id)
 
       await supabase.from('facturas').upsert({
         local_id: local.id,
@@ -231,8 +238,10 @@ export default function FacturasPage() {
         total_servicios: totalServicios,
         retencion_total: retencion,
         total: local.arriendo_actual + totalServicios,
-        estado_servicios: 'pendiente',
-        estado_arriendo: 'pendiente',
+        estado_servicios: existente?.estado_servicios ?? 'pendiente',
+        estado_arriendo: existente?.estado_arriendo ?? 'pendiente',
+        fecha_pago_servicios: existente?.fecha_pago_servicios ?? null,
+        fecha_pago_arriendo: existente?.fecha_pago_arriendo ?? null,
       }, { onConflict: 'local_id,periodo_id' })
     }
     await cargarFacturas()

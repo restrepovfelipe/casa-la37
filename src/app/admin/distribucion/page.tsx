@@ -110,10 +110,12 @@ export default function DistribucionPage() {
   const totalIngresosExtra = ingresos.reduce((s, i) => s + i.monto, 0)
   const tasaSeguridad = periodo?.tasa_seguridad ?? 0
 
-  // Honorarios de administración (categoría 'admin') → van directo a la administradora
-  const honorariosAdmin = gastos.filter(g => g.categoria === 'admin').reduce((s, g) => s + g.monto, 0)
-  // Resto de gastos del edificio (mantenimiento, servicios, impuestos, otros)
-  const otrosGastos = gastos.filter(g => g.categoria !== 'admin').reduce((s, g) => s + g.monto, 0)
+  // Honorarios de administración → SOLO gastos que se llamen "Honorarios administración"
+  // (otros gastos admin como cuota tarjeta, retenciones manuales, etc. se tratan como gasto normal)
+  const esHonorario = (g: Gasto) => g.descripcion.toLowerCase().includes('honorarios')
+  const honorariosAdmin = gastos.filter(esHonorario).reduce((s, g) => s + g.monto, 0)
+  // Todos los demás gastos reducen el pool de todos por igual
+  const otrosGastos = gastos.filter(g => !esHonorario(g)).reduce((s, g) => s + g.monto, 0)
   const totalGastos = honorariosAdmin + otrosGastos
 
   // Pool base que se reparte por % de propiedad (los honorarios ya salieron aparte)
@@ -140,8 +142,8 @@ export default function DistribucionPage() {
   function imprimir() {
     if (!periodo) return
     const rows = distribucion.map(d => {
-      const detalle = d.honorarios > 0
-        ? `<div style="font-size:11px;color:#78614A;margin-top:2px">Admin (10%): ${formatCOP(d.honorarios)} + Propiedad ${d.porcentaje_real}%: ${formatCOP(d.montoProp)}</div>`
+      const detalle = (d.es_administrador && d.honorarios > 0)
+        ? `<div style="font-size:11px;color:#78614A;margin-top:2px">Honorarios admin (10%): ${formatCOP(d.honorarios)} + Propiedad ${d.porcentaje_real}%: ${formatCOP(d.montoProp)}</div>`
         : ''
       return `
       <tr>
@@ -341,9 +343,9 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
               <div className="space-y-1.5">
                 {gastos.map(g => (
                   <div key={g.id} className="flex justify-between text-sm">
-                    <span style={{ color: g.categoria === 'admin' ? 'oklch(0.450 0.100 65)' : 'oklch(0.400 0.018 58)' }}>
+                    <span style={{ color: esHonorario(g) ? 'oklch(0.450 0.100 65)' : 'oklch(0.400 0.018 58)' }}>
                       {g.descripcion}
-                      {g.categoria === 'admin' && (
+                      {esHonorario(g) && (
                         <span className="ml-2 text-xs px-1.5 py-0.5 rounded"
                           style={{ backgroundColor: 'oklch(0.975 0.025 80)', color: 'oklch(0.450 0.100 65)' }}>
                           → Administradora

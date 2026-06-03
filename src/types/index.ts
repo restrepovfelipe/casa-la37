@@ -50,6 +50,7 @@ export type Periodo = {
   estado: 'borrador' | 'facturado' | 'cerrado'
   telesentinel: number
   empleada: number
+  dias_aide: number | null
   fecha_limite_pago: string | null
   created_at: string
 }

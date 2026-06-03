@@ -28,7 +28,7 @@ export default function PeriodosPage() {
     mes: mesActual.toString(),
     anio: anioActual.toString(),
     telesentinel: '',
-    empleada: '',
+    dias_aide: '',
     fecha_limite_pago: '',
   })
   const supabase = createClient()
@@ -46,11 +46,13 @@ export default function PeriodosPage() {
 
   async function guardar() {
     setLoading(true)
+    const dias = parseInt(form.dias_aide) || 4
     await supabase.from('periodos').insert({
       mes: parseInt(form.mes),
       anio: parseInt(form.anio),
       telesentinel: parseFloat(form.telesentinel) || 0,
-      empleada: parseFloat(form.empleada) || 0,
+      empleada: dias * 68000,
+      dias_aide: dias,
       fecha_limite_pago: form.fecha_limite_pago || null,
       estado: 'borrador',
     })
@@ -102,8 +104,17 @@ export default function PeriodosPage() {
                 <Input type="number" placeholder="89000" value={form.telesentinel} onChange={e => setForm({ ...form, telesentinel: e.target.value })} />
               </div>
               <div>
-                <Label>Empleada ($)</Label>
-                <Input type="number" placeholder="120000" value={form.empleada} onChange={e => setForm({ ...form, empleada: e.target.value })} />
+                <Label>Días de Aide este mes</Label>
+                <Input
+                  type="number"
+                  placeholder="4"
+                  min="1" max="5"
+                  value={form.dias_aide}
+                  onChange={e => setForm({ ...form, dias_aide: e.target.value })}
+                />
+                <p className="text-xs mt-1" style={{ color: 'oklch(0.560 0.012 68)' }}>
+                  {form.dias_aide ? `${form.dias_aide} días × $68.000 = ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(parseInt(form.dias_aide) * 68000)}` : '4 o 5 martes según el mes'}
+                </p>
               </div>
               <div>
                 <Label>Fecha límite de pago</Label>
@@ -130,7 +141,7 @@ export default function PeriodosPage() {
                   <Badge variant={estadoColor[p.estado]}>{p.estado}</Badge>
                 </div>
                 <p className="text-sm text-gray-500">
-                  Alarmar: {formatCOP(p.telesentinel)} · Empleada: {formatCOP(p.empleada)}
+                  Alarmar: {formatCOP(p.telesentinel)} · Aide: {p.dias_aide ?? '?'} días ({formatCOP(p.empleada)})
                   {p.fecha_limite_pago && ` · Límite: ${new Date(p.fecha_limite_pago).toLocaleDateString('es-CO')}`}
                 </p>
               </div>

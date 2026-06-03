@@ -195,18 +195,29 @@ export default function FacturasPage() {
     if (data) setFacturas(data as (Factura & { locales: Local })[])
   }
 
+  // Determina si un local paga Alarmar (solo pisos 3xx y 4xx)
+  function localPagaAlarmar(numero: string): boolean {
+    const nums = numero.match(/\d+/g) ?? []
+    return nums.some(n => { const v = parseInt(n); return v >= 300 && v < 500 })
+  }
+
   async function generarFacturas() {
     setGenerando(true)
     const { data: lects } = await supabase.from('lecturas').select('*').eq('periodo_id', periodoId)
-    const numLocales = locales.length
-    const alarmaXLocal = (periodo?.telesentinel ?? 0) / numLocales
-    const empleadaXLocal = (periodo?.empleada ?? 0) / numLocales
+    const localesConAlarma = locales.filter(l => localPagaAlarmar(l.numero))
+    const alarmaXLocal = localesConAlarma.length > 0
+      ? (periodo?.telesentinel ?? 0) / localesConAlarma.length
+      : 0
+    const empleadaXLocal = locales.length > 0
+      ? (periodo?.empleada ?? 0) / locales.length
+      : 0
 
     for (const local of locales) {
       const lectura = lects?.find(l => l.local_id === local.id)
       const agua = lectura?.agua_total ?? 0
       const luz = lectura?.luz_total ?? 0
-      const totalServicios = agua + luz + alarmaXLocal + empleadaXLocal
+      const alarma = localPagaAlarmar(local.numero) ? alarmaXLocal : 0
+      const totalServicios = agua + luz + alarma + empleadaXLocal
 
       await supabase.from('facturas').upsert({
         local_id: local.id,
@@ -214,7 +225,7 @@ export default function FacturasPage() {
         arriendo: local.arriendo_actual,
         agua_total: agua,
         luz_total: luz,
-        alarma_total: alarmaXLocal,
+        alarma_total: alarma,
         empleada_total: empleadaXLocal,
         total_servicios: totalServicios,
         total: local.arriendo_actual + totalServicios,

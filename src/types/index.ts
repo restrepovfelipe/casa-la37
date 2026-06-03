@@ -15,6 +15,7 @@ export type Propietario = {
   tipo_cuenta: string | null
   numero_cuenta: string | null
   nequi: string | null
+  es_administrador: boolean
   created_at: string
 }
 

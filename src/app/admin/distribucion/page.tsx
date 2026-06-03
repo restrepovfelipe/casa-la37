@@ -79,21 +79,34 @@ export default function DistribucionPage() {
   const formatCOP = (n: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
 
-  // Cálculo principal
+  // ── Cálculo principal ────────────────────────────────────────────────────────
   const totalArriendos = facturas.reduce((s, f) => s + f.arriendo, 0)
   const totalRetenciones = facturas.reduce((s, f) => s + (f.retencion_total ?? 0), 0)
-  const totalGastos = gastos.reduce((s, g) => s + g.monto, 0)
   const totalIngresosExtra = ingresos.reduce((s, i) => s + i.monto, 0)
   const tasaSeguridad = periodo?.tasa_seguridad ?? 0
-  const netoDistribuible = totalArriendos + totalIngresosExtra - totalRetenciones - totalGastos - tasaSeguridad
+
+  // Honorarios de administración (categoría 'admin') → van directo a la administradora
+  const honorariosAdmin = gastos.filter(g => g.categoria === 'admin').reduce((s, g) => s + g.monto, 0)
+  // Resto de gastos del edificio (mantenimiento, servicios, impuestos, otros)
+  const otrosGastos = gastos.filter(g => g.categoria !== 'admin').reduce((s, g) => s + g.monto, 0)
+  const totalGastos = honorariosAdmin + otrosGastos
+
+  // Pool base que se reparte por % de propiedad (los honorarios ya salieron aparte)
+  const poolPropietarios = totalArriendos + totalIngresosExtra - totalRetenciones - otrosGastos - tasaSeguridad - honorariosAdmin
+
+  // Neto total a distribuir (para mostrar en resumen)
+  const netoDistribuible = totalArriendos + totalIngresosExtra - totalRetenciones - otrosGastos - tasaSeguridad
+  // (honorariosAdmin ya está incluido en netoDistribuible: se resta de pool pero se suma a admin)
 
   const propietariosConPct = propietarios.filter(p => (p.porcentaje_real ?? 0) > 0)
   const totalPct = propietariosConPct.reduce((s, p) => s + (p.porcentaje_real ?? 0), 0)
 
   const distribucion = propietariosConPct.map(p => {
-    const monto = Math.round(netoDistribuible * (p.porcentaje_real ?? 0) / 100)
+    const montoProp = Math.round(poolPropietarios * (p.porcentaje_real ?? 0) / 100)
+    const honorarios = p.es_administrador ? honorariosAdmin : 0
+    const monto = montoProp + honorarios
     const cuatromil = Math.round(monto * 0.004)
-    return { ...p, monto, cuatromil, neto: monto - cuatromil }
+    return { ...p, monto, cuatromil, neto: monto - cuatromil, montoProp, honorarios }
   })
 
   const totalDistribuido = distribucion.reduce((s, d) => s + d.monto, 0)
@@ -101,15 +114,20 @@ export default function DistribucionPage() {
 
   function imprimir() {
     if (!periodo) return
-    const rows = distribucion.map(d => `
+    const rows = distribucion.map(d => {
+      const detalle = d.honorarios > 0
+        ? `<div style="font-size:11px;color:#78614A;margin-top:2px">Admin (10%): ${formatCOP(d.honorarios)} + Propiedad ${d.porcentaje_real}%: ${formatCOP(d.montoProp)}</div>`
+        : ''
+      return `
       <tr>
-        <td>${d.nombre}</td>
+        <td>${d.nombre}${d.es_administrador ? ' <span style="font-size:10px;background:#FEF3C7;padding:1px 4px;border-radius:3px">Administradora</span>' : ''}${detalle}</td>
         <td style="text-align:right">${d.porcentaje_real}%</td>
         <td style="text-align:right">${formatCOP(d.monto)}</td>
         <td style="text-align:right;color:#a16207">−${formatCOP(d.cuatromil)}</td>
         <td style="text-align:right;font-weight:600">${formatCOP(d.neto)}</td>
         <td style="font-size:11px">${[d.banco, d.tipo_cuenta, d.numero_cuenta].filter(Boolean).join(' · ')}${d.nequi ? ` | Nequi: ${d.nequi}` : ''}</td>
-      </tr>`).join('')
+      </tr>`
+    }).join('')
 
     const extraRows = ingresos.length > 0
       ? ingresos.map(i => `<tr><td colspan="5" style="color:#15803d">+ ${i.descripcion}</td><td style="text-align:right;color:#15803d">${formatCOP(i.monto)}</td></tr>`).join('')
@@ -124,7 +142,7 @@ h1{font-size:20px;margin-bottom:4px}h1 span{color:#9A7B35}.sub{color:#78614A;fon
 .box .val{font-size:15px;font-weight:600}
 table{width:100%;border-collapse:collapse;margin-top:16px}
 th{text-align:left;font-size:10px;text-transform:uppercase;color:#78614A;padding:6px 0;border-bottom:1px solid #E8E0D6}
-td{padding:9px 6px 9px 0;border-bottom:1px solid #F0EBE3;font-size:13px}
+td{padding:9px 6px 9px 0;border-bottom:1px solid #F0EBE3;font-size:13px;vertical-align:top}
 .footer{margin-top:32px;padding-top:12px;border-top:1px solid #E8E0D6;font-size:11px;color:#78614A;text-align:center}</style>
 </head><body>
 <h1>Casa <span>La37</span> — Distribución</h1>
@@ -132,9 +150,13 @@ td{padding:9px 6px 9px 0;border-bottom:1px solid #F0EBE3;font-size:13px}
 <div class="grid">
 <div class="box"><label>Arriendos</label><div class="val">${formatCOP(totalArriendos)}</div></div>
 ${totalIngresosExtra > 0 ? `<div class="box"><label>Ingresos extra</label><div class="val" style="color:#15803d">+${formatCOP(totalIngresosExtra)}</div></div>` : ''}
-<div class="box"><label>Retenciones + Gastos</label><div class="val" style="color:#a16207">−${formatCOP(totalRetenciones + totalGastos + tasaSeguridad)}</div></div>
+<div class="box"><label>Retenciones + Gastos edificio</label><div class="val" style="color:#a16207">−${formatCOP(totalRetenciones + otrosGastos + tasaSeguridad)}</div></div>
 <div class="box"><label>Neto a distribuir</label><div class="val" style="color:#9A7B35">${formatCOP(netoDistribuible)}</div></div>
 </div>
+${honorariosAdmin > 0 ? `<div style="background:#FEF3C7;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#92400E">
+  <strong>Honorarios de administración (10%):</strong> ${formatCOP(honorariosAdmin)} → se pagan directamente a la administradora antes de repartir.<br/>
+  Pool para distribución por propiedad: ${formatCOP(poolPropietarios)}
+</div>` : ''}
 <table><thead><tr><th>Propietario</th><th style="text-align:right">%</th><th style="text-align:right">Bruto</th><th style="text-align:right">4×mil</th><th style="text-align:right">Neto</th><th>Cuenta</th></tr></thead>
 <tbody>${extraRows}${rows}</tbody></table>
 ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caja menor: ${formatCOP(cajaMenor)}</p>` : ''}
@@ -185,7 +207,7 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
               { label: 'Arriendos', value: totalArriendos, color: 'oklch(0.185 0.020 55)' },
               { label: 'Ingresos extra', value: totalIngresosExtra, color: '#16a34a', prefix: '+' },
               { label: 'Retenciones', value: -totalRetenciones, color: totalRetenciones > 0 ? 'oklch(0.600 0.140 50)' : 'oklch(0.560 0.012 68)' },
-              { label: 'Gastos', value: -(totalGastos + tasaSeguridad), color: (totalGastos + tasaSeguridad) > 0 ? 'oklch(0.540 0.180 30)' : 'oklch(0.560 0.012 68)' },
+              { label: 'Gastos edificio', value: -(otrosGastos + tasaSeguridad), color: (otrosGastos + tasaSeguridad) > 0 ? 'oklch(0.540 0.180 30)' : 'oklch(0.560 0.012 68)' },
               { label: 'Neto a distribuir', value: netoDistribuible, color: '#9A7B35', bold: true },
             ].map(card => (
               <div key={card.label} className="rounded-xl p-4 border" style={{ backgroundColor: '#FFF', borderColor: 'oklch(0.880 0.012 72)' }}>
@@ -193,11 +215,28 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
                 <p className="text-base font-semibold" style={{ color: card.color, fontWeight: card.bold ? 700 : 600 }}>
                   {card.value < 0
                     ? `−${formatCOP(-card.value)}`
-                    : `${(card as {prefix?: string}).prefix ?? ''}${formatCOP(card.value)}`}
+                    : `${(card as { prefix?: string }).prefix ?? ''}${formatCOP(card.value)}`}
                 </p>
               </div>
             ))}
           </div>
+
+          {/* Banner honorarios administración */}
+          {honorariosAdmin > 0 && (
+            <div className="rounded-xl border px-4 py-3 mb-6 flex items-start gap-3"
+              style={{ backgroundColor: 'oklch(0.975 0.025 80)', borderColor: 'oklch(0.860 0.060 80)' }}>
+              <span className="text-lg mt-0.5">🏛️</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold" style={{ color: 'oklch(0.450 0.100 65)' }}>
+                  Honorarios de administración (10%): {formatCOP(honorariosAdmin)}
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'oklch(0.560 0.060 65)' }}>
+                  Este monto se paga <strong>primero</strong> a la administradora, antes de repartir.
+                  Pool para distribución por propiedad: <strong>{formatCOP(poolPropietarios)}</strong>
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Ingresos extraordinarios */}
           <div className="rounded-xl border p-4 mb-6" style={{ borderColor: 'oklch(0.880 0.012 72)', backgroundColor: '#FFF' }}>
@@ -241,14 +280,22 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
             )}
           </div>
 
-          {/* Gastos desglose (colapsable visual) */}
+          {/* Gastos desglose */}
           {(gastos.length > 0 || tasaSeguridad > 0) && (
             <div className="rounded-xl border p-4 mb-6" style={{ borderColor: 'oklch(0.880 0.012 72)', backgroundColor: '#FFF' }}>
               <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'oklch(0.520 0.015 60)' }}>Desglose de gastos</p>
               <div className="space-y-1.5">
                 {gastos.map(g => (
                   <div key={g.id} className="flex justify-between text-sm">
-                    <span style={{ color: 'oklch(0.400 0.018 58)' }}>{g.descripcion}</span>
+                    <span style={{ color: g.categoria === 'admin' ? 'oklch(0.450 0.100 65)' : 'oklch(0.400 0.018 58)' }}>
+                      {g.descripcion}
+                      {g.categoria === 'admin' && (
+                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded"
+                          style={{ backgroundColor: 'oklch(0.975 0.025 80)', color: 'oklch(0.450 0.100 65)' }}>
+                          → Administradora
+                        </span>
+                      )}
+                    </span>
                     <span style={{ color: 'oklch(0.300 0.018 58)' }}>{formatCOP(g.monto)}</span>
                   </div>
                 ))}
@@ -285,16 +332,40 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
                   <div
                     key={d.id}
                     className="rounded-xl border px-5 py-4"
-                    style={{ backgroundColor: '#FFF', borderColor: 'oklch(0.880 0.012 72)' }}
+                    style={{
+                      backgroundColor: '#FFF',
+                      borderColor: d.es_administrador ? 'oklch(0.860 0.060 80)' : 'oklch(0.880 0.012 72)',
+                    }}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <p className="font-semibold" style={{ color: 'oklch(0.185 0.020 55)' }}>{d.nombre}</p>
                           <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'oklch(0.945 0.012 72)', color: 'oklch(0.520 0.015 60)' }}>
                             {d.porcentaje_real}%
                           </span>
+                          {d.es_administrador && (
+                            <span className="text-xs px-1.5 py-0.5 rounded font-medium"
+                              style={{ backgroundColor: 'oklch(0.975 0.025 80)', color: 'oklch(0.450 0.100 65)' }}>
+                              Administradora
+                            </span>
+                          )}
                         </div>
+
+                        {/* Desglose para la administradora */}
+                        {d.es_administrador && d.honorarios > 0 && (
+                          <div className="text-xs mb-1.5 space-y-0.5">
+                            <div className="flex gap-1" style={{ color: 'oklch(0.450 0.100 65)' }}>
+                              <span>Honorarios admin (10%):</span>
+                              <span className="font-medium">{formatCOP(d.honorarios)}</span>
+                            </div>
+                            <div className="flex gap-1" style={{ color: 'oklch(0.400 0.018 58)' }}>
+                              <span>Propiedad {d.porcentaje_real}%:</span>
+                              <span className="font-medium">{formatCOP(d.montoProp)}</span>
+                            </div>
+                          </div>
+                        )}
+
                         {(d.banco || d.tipo_cuenta || d.numero_cuenta) && (
                           <p className="text-xs" style={{ color: 'oklch(0.520 0.015 60)' }}>
                             {[d.banco, d.tipo_cuenta, d.numero_cuenta].filter(Boolean).join(' · ')}

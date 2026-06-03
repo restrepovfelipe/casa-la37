@@ -18,13 +18,13 @@ SET
   total           = f.total_servicios
                     + l.arriendo_actual
                     - ROUND(l.arriendo_actual * COALESCE(l.retencion_pct, 0) / 100)
-FROM locales l
-JOIN periodos p ON p.id = f.periodo_id
-WHERE f.local_id = l.id
+FROM locales l, periodos p
+WHERE f.local_id   = l.id
+  AND f.periodo_id = p.id
   AND p.anio = 2026
   AND p.mes  BETWEEN 1 AND 6
   AND f.arriendo = 0
-  -- Excluir Local 306 en ene/feb (arriendo $0 es correcto)
+  -- Excluir Local 306 en ene/feb (arriendo $0 es correcto — Ereo pre-pagó)
   AND NOT (l.numero ILIKE '%306%' AND p.mes IN (1, 2))
   -- Excluir Local 205 (desocupado — verificar mes a mes)
   AND l.numero NOT ILIKE '%205%';

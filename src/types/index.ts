@@ -26,6 +26,7 @@ export type Local = {
   arriendo_actual: number
   fecha_inicio_contrato: string | null
   puntos_incremento_ipc: number
+  retencion_pct: number
   activo: boolean
   created_at: string
   propietarios?: Propietario
@@ -51,6 +52,7 @@ export type Periodo = {
   telesentinel: number
   empleada: number
   dias_aide: number | null
+  tasa_seguridad: number
   fecha_limite_pago: string | null
   created_at: string
 }
@@ -86,6 +88,7 @@ export type Factura = {
   alarma_total: number
   empleada_total: number
   total_servicios: number
+  retencion_total: number
   total: number
   estado_servicios: 'pendiente' | 'pagado'
   estado_arriendo: 'pendiente' | 'pagado'
@@ -100,7 +103,24 @@ export type Factura = {
   periodos?: Periodo
 }
 
+export type Gasto = {
+  id: string
+  periodo_id: string
+  descripcion: string
+  monto: number
+  categoria: 'mantenimiento' | 'servicios' | 'admin' | 'impuesto' | 'otro'
+  created_at: string
+}
+
 export const MESES = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ]
+
+export const CATEGORIAS_GASTO: Record<string, string> = {
+  mantenimiento: 'Mantenimiento',
+  servicios: 'Servicios públicos',
+  admin: 'Administración',
+  impuesto: 'Impuesto',
+  otro: 'Otro',
+}

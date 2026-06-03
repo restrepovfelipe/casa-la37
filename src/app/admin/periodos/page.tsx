@@ -29,6 +29,7 @@ export default function PeriodosPage() {
     anio: anioActual.toString(),
     telesentinel: '',
     dias_aide: '',
+    tasa_seguridad: '',
     fecha_limite_pago: '',
   })
   const supabase = createClient()
@@ -53,6 +54,7 @@ export default function PeriodosPage() {
       telesentinel: parseFloat(form.telesentinel) || 0,
       empleada: dias * 68000,
       dias_aide: dias,
+      tasa_seguridad: parseFloat(form.tasa_seguridad) || 0,
       fecha_limite_pago: form.fecha_limite_pago || null,
       estado: 'borrador',
     })
@@ -72,7 +74,10 @@ export default function PeriodosPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Periodos de facturación</h1>
+        <div>
+          <h1 className="text-2xl font-semibold mb-1" style={{ color: 'oklch(0.185 0.020 55)' }}>Periodos</h1>
+          <p className="text-sm" style={{ color: 'oklch(0.520 0.015 60)' }}>Meses de facturación del edificio</p>
+        </div>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger>
             <Button>+ Nuevo periodo</Button>
@@ -113,7 +118,21 @@ export default function PeriodosPage() {
                   onChange={e => setForm({ ...form, dias_aide: e.target.value })}
                 />
                 <p className="text-xs mt-1" style={{ color: 'oklch(0.560 0.012 68)' }}>
-                  {form.dias_aide ? `${form.dias_aide} días × $68.000 = ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(parseInt(form.dias_aide) * 68000)}` : '4 o 5 martes según el mes'}
+                  {form.dias_aide
+                    ? `${form.dias_aide} días × $68.000 = ${new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(parseInt(form.dias_aide) * 68000)}`
+                    : '4 o 5 martes según el mes'}
+                </p>
+              </div>
+              <div>
+                <Label>Tasa de Seguridad ($)</Label>
+                <Input
+                  type="number"
+                  placeholder="0"
+                  value={form.tasa_seguridad}
+                  onChange={e => setForm({ ...form, tasa_seguridad: e.target.value })}
+                />
+                <p className="text-xs mt-1" style={{ color: 'oklch(0.560 0.012 68)' }}>
+                  Impuesto Gobernación. Se divide entre todos los locales activos.
                 </p>
               </div>
               <div>
@@ -142,6 +161,7 @@ export default function PeriodosPage() {
                 </div>
                 <p className="text-sm text-gray-500">
                   Alarmar: {formatCOP(p.telesentinel)} · Aide: {p.dias_aide ?? '?'} días ({formatCOP(p.empleada)})
+                  {p.tasa_seguridad > 0 && ` · Tasa seguridad: ${formatCOP(p.tasa_seguridad)}`}
                   {p.fecha_limite_pago && ` · Límite: ${new Date(p.fecha_limite_pago).toLocaleDateString('es-CO')}`}
                 </p>
               </div>

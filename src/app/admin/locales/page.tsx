@@ -13,12 +13,12 @@ import { Badge } from '@/components/ui/badge'
 
 type FormLocal = {
   numero: string; nombre: string; propietario_id: string; arriendo_actual: string
-  fecha_inicio_contrato: string; puntos_incremento_ipc: string; activo: boolean
+  fecha_inicio_contrato: string; puntos_incremento_ipc: string; retencion_pct: string; activo: boolean
 }
 
 const vacio: FormLocal = {
   numero: '', nombre: '', propietario_id: '', arriendo_actual: '',
-  fecha_inicio_contrato: '', puntos_incremento_ipc: '0', activo: true,
+  fecha_inicio_contrato: '', puntos_incremento_ipc: '0', retencion_pct: '0', activo: true,
 }
 
 type HistorialItem = Factura & { periodos: Periodo }
@@ -58,7 +58,8 @@ export default function LocalesPage() {
     setForm({
       numero: l.numero, nombre: l.nombre ?? '', propietario_id: l.propietario_id ?? '',
       arriendo_actual: l.arriendo_actual.toString(), fecha_inicio_contrato: l.fecha_inicio_contrato ?? '',
-      puntos_incremento_ipc: l.puntos_incremento_ipc.toString(), activo: l.activo,
+      puntos_incremento_ipc: l.puntos_incremento_ipc.toString(),
+      retencion_pct: (l.retencion_pct ?? 0).toString(), activo: l.activo,
     })
     setEditId(l.id); setOpen(true)
   }
@@ -71,6 +72,7 @@ export default function LocalesPage() {
       arriendo_actual: parseFloat(form.arriendo_actual) || 0,
       fecha_inicio_contrato: form.fecha_inicio_contrato || null,
       puntos_incremento_ipc: parseFloat(form.puntos_incremento_ipc) || 0,
+      retencion_pct: parseFloat(form.retencion_pct) || 0,
       activo: form.activo,
     }
     if (editId) { await supabase.from('locales').update(payload).eq('id', editId) }
@@ -160,6 +162,13 @@ export default function LocalesPage() {
                 <Label>Puntos adicionales al IPC (%)</Label>
                 <Input type="number" step="0.5" placeholder="2" value={form.puntos_incremento_ipc} onChange={e => setForm({ ...form, puntos_incremento_ipc: e.target.value })} />
               </div>
+              <div>
+                <Label>Retención en la fuente (%)</Label>
+                <Input type="number" step="0.1" placeholder="0" value={form.retencion_pct} onChange={e => setForm({ ...form, retencion_pct: e.target.value })} />
+                <p className="text-xs mt-1" style={{ color: 'oklch(0.560 0.012 68)' }}>
+                  Ej: 3.5 para Octus. Se descuenta del arriendo al calcular distribución.
+                </p>
+              </div>
               <Button className="w-full" onClick={guardar} disabled={loading || !form.numero}>
                 {loading ? 'Guardando...' : 'Guardar'}
               </Button>
@@ -233,6 +242,11 @@ export default function LocalesPage() {
                       ? `Contrato desde: ${new Date(principal.fecha_inicio_contrato + 'T12:00:00').toLocaleDateString('es-CO')}`
                       : 'Sin fecha de contrato'}
                     {' · '}IPC +{principal.puntos_incremento_ipc}pts
+                    {grupo.some(x => (x.retencion_pct ?? 0) > 0) && (
+                      <span style={{ color: 'oklch(0.600 0.140 50)' }}>
+                        {' · '}Retención {grupo[0].retencion_pct}%
+                      </span>
+                    )}
                   </p>
                 </div>
                 {/* Botones — se reorganizan en filas si hay muchos */}

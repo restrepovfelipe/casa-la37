@@ -218,6 +218,7 @@ export default function FacturasPage() {
       const luz = lectura?.luz_total ?? 0
       const alarma = localPagaAlarmar(local.numero) ? alarmaXLocal : 0
       const totalServicios = agua + luz + alarma + empleadaXLocal
+      const retencion = Math.round(local.arriendo_actual * (local.retencion_pct ?? 0) / 100)
 
       await supabase.from('facturas').upsert({
         local_id: local.id,
@@ -228,6 +229,7 @@ export default function FacturasPage() {
         alarma_total: alarma,
         empleada_total: empleadaXLocal,
         total_servicios: totalServicios,
+        retencion_total: retencion,
         total: local.arriendo_actual + totalServicios,
         estado_servicios: 'pendiente',
         estado_arriendo: 'pendiente',
@@ -276,20 +278,48 @@ export default function FacturasPage() {
   const serviciosPendientes = facturas.filter(f => f.estado_servicios === 'pendiente').length
   const arriendosPendientes = facturas.filter(f => f.estado_arriendo === 'pendiente').length
 
-  const porPropietario: Record<string, { nombre: string; total: number; banco: string; nequi: string | null }> = {}
-  facturas.forEach(f => {
-    const prop = (f.locales as Local)?.propietarios as Propietario
-    if (!prop) return
-    if (!porPropietario[prop.id]) {
+  // Distribution model: use porcentaje_real if set, else fall back to per-local arriendo
+  const [propietariosAll, setPropietariosAll] = useState<Propietario[]>([])
+  useEffect(() => {
+    supabase.from('propietarios').select('*').order('nombre').then(({ data }) => { if (data) setPropietariosAll(data) })
+  }, [])
+
+  const totalArriendosDistrib = facturas.reduce((s, f) => s + f.arriendo, 0)
+  const totalRetencion = facturas.reduce((s, f) => s + (f.retencion_total ?? 0), 0)
+  const usarModeloDistrib = propietariosAll.some(p => (p.porcentaje_real ?? 0) > 0)
+
+  const porPropietario: Record<string, { nombre: string; total: number; banco: string; nequi: string | null; porcentaje: number }> = {}
+
+  if (usarModeloDistrib && facturas.length > 0) {
+    // Model: net = arriendos - retenciones, distributed by porcentaje_real
+    const neto = totalArriendosDistrib - totalRetencion
+    propietariosAll.forEach(prop => {
+      if ((prop.porcentaje_real ?? 0) <= 0) return
       porPropietario[prop.id] = {
         nombre: prop.nombre,
-        total: 0,
+        total: Math.round(neto * (prop.porcentaje_real ?? 0) / 100),
         banco: `${prop.banco ?? ''} · ${prop.tipo_cuenta ?? ''} ${prop.numero_cuenta ?? ''}`.trim().replace(/^·\s*/, ''),
         nequi: prop.nequi,
+        porcentaje: prop.porcentaje_real ?? 0,
       }
-    }
-    porPropietario[prop.id].total += f.arriendo
-  })
+    })
+  } else {
+    // Fallback: sum arriendos per propietario
+    facturas.forEach(f => {
+      const prop = (f.locales as Local)?.propietarios as Propietario
+      if (!prop) return
+      if (!porPropietario[prop.id]) {
+        porPropietario[prop.id] = {
+          nombre: prop.nombre,
+          total: 0,
+          banco: `${prop.banco ?? ''} · ${prop.tipo_cuenta ?? ''} ${prop.numero_cuenta ?? ''}`.trim().replace(/^·\s*/, ''),
+          nequi: prop.nequi,
+          porcentaje: 0,
+        }
+      }
+      porPropietario[prop.id].total += f.arriendo
+    })
+  }
 
   const vencidasCount = facturas.filter(f => estaVencida(f)).length
 
@@ -452,10 +482,11 @@ export default function FacturasPage() {
                           { l: 'Empleada', v: f.empleada_total },
                           { l: 'Subtotal servicios', v: f.total_servicios, bold: true },
                           { l: 'Arriendo', v: f.arriendo },
+                          ...((f.retencion_total ?? 0) > 0 ? [{ l: 'Retención fuente', v: -(f.retencion_total), warn: true }] : []),
                         ].map(row => (
                           <div key={row.l} className="flex justify-between col-span-1">
-                            <span style={{ color: 'oklch(0.520 0.015 60)', fontWeight: row.bold ? 600 : 400 }}>{row.l}</span>
-                            <span style={{ color: 'oklch(0.300 0.018 58)', fontWeight: row.bold ? 600 : 400 }}>{formatCOP(row.v)}</span>
+                            <span style={{ color: (row as {warn?: boolean}).warn ? 'oklch(0.600 0.140 50)' : 'oklch(0.520 0.015 60)', fontWeight: row.bold ? 600 : 400 }}>{row.l}</span>
+                            <span style={{ color: (row as {warn?: boolean}).warn ? 'oklch(0.600 0.140 50)' : 'oklch(0.300 0.018 58)', fontWeight: row.bold ? 600 : 400 }}>{(row as {warn?: boolean}).warn ? `−${formatCOP(f.retencion_total)}` : formatCOP(row.v)}</span>
                           </div>
                         ))}
                       </div>
@@ -541,24 +572,38 @@ export default function FacturasPage() {
           {/* Desembolsos a propietarios */}
           {Object.keys(porPropietario).length > 0 && (
             <div>
-              <h2 className="text-sm font-semibold uppercase tracking-wide mb-4" style={{ color: 'oklch(0.520 0.015 60)', letterSpacing: '0.08em' }}>
-                Transferir arriendos a propietarios
+              <h2 className="text-sm font-semibold uppercase tracking-wide mb-2" style={{ color: 'oklch(0.520 0.015 60)', letterSpacing: '0.08em' }}>
+                Distribución a propietarios
               </h2>
+              {usarModeloDistrib && (
+                <div className="rounded-lg px-4 py-2.5 mb-4 flex flex-wrap gap-x-6 gap-y-1 text-xs" style={{ backgroundColor: 'oklch(0.960 0.020 72)', border: '1px solid oklch(0.880 0.012 72)' }}>
+                  <span style={{ color: 'oklch(0.520 0.015 60)' }}>Total arriendos: <strong style={{ color: 'oklch(0.185 0.020 55)' }}>{formatCOP(totalArriendosDistrib)}</strong></span>
+                  {totalRetencion > 0 && <span style={{ color: 'oklch(0.600 0.140 50)' }}>Retenciones: <strong>−{formatCOP(totalRetencion)}</strong></span>}
+                  <span style={{ color: '#9A7B35' }}>Neto a distribuir: <strong>{formatCOP(totalArriendosDistrib - totalRetencion)}</strong></span>
+                </div>
+              )}
               <div className="grid gap-3">
-                {Object.values(porPropietario).map((p, i) => (
-                  <div
-                    key={i}
-                    className="rounded-xl border px-5 py-4 flex items-center justify-between"
-                    style={{ backgroundColor: '#FFF', borderColor: 'oklch(0.880 0.012 72)' }}
-                  >
-                    <div>
-                      <p className="font-medium" style={{ color: 'oklch(0.185 0.020 55)' }}>{p.nombre}</p>
-                      {p.banco && <p className="text-xs mt-0.5" style={{ color: 'oklch(0.520 0.015 60)' }}>{p.banco}</p>}
-                      {p.nequi && <p className="text-xs" style={{ color: '#25D366' }}>Nequi: {p.nequi}</p>}
+                {Object.values(porPropietario).map((p, i) => {
+                  const cuatromil = Math.round(p.total * 0.004)
+                  return (
+                    <div
+                      key={i}
+                      className="rounded-xl border px-5 py-4 flex items-center justify-between"
+                      style={{ backgroundColor: '#FFF', borderColor: 'oklch(0.880 0.012 72)' }}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium" style={{ color: 'oklch(0.185 0.020 55)' }}>{p.nombre}</p>
+                          {p.porcentaje > 0 && <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'oklch(0.945 0.012 72)', color: 'oklch(0.520 0.015 60)' }}>{p.porcentaje}%</span>}
+                        </div>
+                        {p.banco && <p className="text-xs mt-0.5" style={{ color: 'oklch(0.520 0.015 60)' }}>{p.banco}</p>}
+                        {p.nequi && <p className="text-xs" style={{ color: '#25D366' }}>Nequi: {p.nequi}</p>}
+                        {cuatromil > 0 && <p className="text-xs mt-0.5" style={{ color: 'oklch(0.560 0.012 68)' }}>4×mil: −{formatCOP(cuatromil)} → neto {formatCOP(p.total - cuatromil)}</p>}
+                      </div>
+                      <p className="text-xl font-semibold" style={{ color: '#9A7B35' }}>{formatCOP(p.total)}</p>
                     </div>
-                    <p className="text-xl font-semibold" style={{ color: '#9A7B35' }}>{formatCOP(p.total)}</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}

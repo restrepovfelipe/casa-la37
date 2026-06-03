@@ -214,7 +214,19 @@ export default function LocalesPage() {
                         : formatCOP(principal.arriendo_actual)
                       }
                     </span>
-                    {' · '}Propietario: {(principal.propietarios as Propietario)?.nombre ?? 'Sin asignar'}
+                    {' · '}
+                    {esGrupo ? (
+                      // Mostrar propietario de cada local si son distintos
+                      (() => {
+                        const props = grupo.map(x => ({ num: x.numero, prop: (x.propietarios as Propietario)?.nombre }))
+                        const todosIguales = props.every(p => p.prop === props[0].prop)
+                        return todosIguales
+                          ? `Propietario: ${props[0].prop ?? 'Sin asignar'}`
+                          : props.map(p => `${p.num}: ${p.prop ?? 'Sin asignar'}`).join(' · ')
+                      })()
+                    ) : (
+                      `Propietario: ${(principal.propietarios as Propietario)?.nombre ?? 'Sin asignar'}`
+                    )}
                   </p>
                   <p className="text-xs" style={{ color: 'oklch(0.560 0.012 68)' }}>
                     {principal.fecha_inicio_contrato

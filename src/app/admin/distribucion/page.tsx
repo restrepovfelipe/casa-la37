@@ -17,8 +17,6 @@ export default function DistribucionPage() {
   const [gastos, setGastos] = useState<Gasto[]>([])
   const [ingresos, setIngresos] = useState<IngresoExtra[]>([])
   const [propietarios, setPropietarios] = useState<Propietario[]>([])
-
-  // Modal ingreso extra
   const [ingModal, setIngModal] = useState<{ id?: string; descripcion: string; monto: string } | null>(null)
   const [savingIng, setSavingIng] = useState(false)
   const [calculandoHonorarios, setCalculandoHonorarios] = useState(false)
@@ -53,6 +51,26 @@ export default function DistribucionPage() {
     if (ing) setIngresos(ing as IngresoExtra[])
   }
 
+  async function calcularHonorarios() {
+    setCalculandoHonorarios(true)
+    const base = facturas.reduce((s, f) => s + f.arriendo, 0)
+      + ingresos.reduce((s, i) => s + i.monto, 0)
+    const monto = Math.round(base * 0.10)
+    const existente = gastos.find(g => g.descripcion.toLowerCase().includes('honorarios'))
+    if (existente) {
+      await supabase.from('gastos').update({ monto, descripcion: 'Honorarios administración (10%)' }).eq('id', existente.id)
+    } else {
+      await supabase.from('gastos').insert({
+        periodo_id: periodoId,
+        descripcion: 'Honorarios administración (10%)',
+        monto,
+        categoria: 'admin',
+      })
+    }
+    await cargarDatos()
+    setCalculandoHonorarios(false)
+  }
+
   async function guardarIngreso() {
     if (!ingModal) return
     setSavingIng(true)
@@ -71,94 +89,70 @@ export default function DistribucionPage() {
     setSavingIng(false)
   }
 
-  async function calcularHonorarios() {
-    setCalculandoHonorarios(true)
-    // Base de cálculo: arriendos + ingresos extraordinarios del periodo
-    const base = facturas.reduce((s, f) => s + f.arriendo, 0)
-      + ingresos.reduce((s, i) => s + i.monto, 0)
-    const monto = Math.round(base * 0.10)
-
-    // Busca si ya existe un gasto de honorarios admin para este periodo
-    const existente = gastos.find(g => g.categoria === 'admin' && g.descripcion.toLowerCase().includes('honorarios'))
-
-    if (existente) {
-      await supabase.from('gastos').update({ monto, descripcion: 'Honorarios administración (10%)' }).eq('id', existente.id)
-    } else {
-      await supabase.from('gastos').insert({
-        periodo_id: periodoId,
-        descripcion: 'Honorarios administración (10%)',
-        monto,
-        categoria: 'admin',
-      })
-    }
-    await cargarDatos()
-    setCalculandoHonorarios(false)
-  }
-
   async function eliminarIngreso(id: string) {
     if (!confirm('¿Eliminar este ingreso?')) return
     await supabase.from('ingresos_extra').delete().eq('id', id)
     await cargarDatos()
   }
 
-  const formatCOP = (n: number) =>
+  const fmt = (n: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
 
-  // ── Cálculo principal ────────────────────────────────────────────────────────
+  // ── Cálculo ──────────────────────────────────────────────────────────────────
+  // Modelo correcto según Excel:
+  // 1. Ingresos = arriendos + ingresos extraordinarios
+  // 2. Gastos = TODOS los gastos del edificio, incluidos honorarios de administración
+  //    (los honorarios se pagan a Ximena como factura de administración, no como parte
+  //     de la distribución de propietarios)
+  // 3. Neto = Ingresos - Retenciones(facturas) - Gastos - Tasa seguridad
+  // 4. Cada propietario = Neto × su_porcentaje (TODOS igual, incluyendo Ximena)
+  //
+  // IMPORTANTE: No ingresar "Retención Octus" como gasto manual si ya está calculada
+  // en las facturas — se contaría doble.
+
   const totalArriendos = facturas.reduce((s, f) => s + f.arriendo, 0)
   const totalRetenciones = facturas.reduce((s, f) => s + (f.retencion_total ?? 0), 0)
   const totalIngresosExtra = ingresos.reduce((s, i) => s + i.monto, 0)
   const tasaSeguridad = periodo?.tasa_seguridad ?? 0
+  const totalGastos = gastos.reduce((s, g) => s + g.monto, 0)
 
-  // Honorarios de administración → SOLO gastos que se llamen "Honorarios administración"
-  // (otros gastos admin como cuota tarjeta, retenciones manuales, etc. se tratan como gasto normal)
+  // Detectar posible doble conteo de retención
+  const retencionEnGastos = gastos
+    .filter(g => g.descripcion.toLowerCase().includes('retenci'))
+    .reduce((s, g) => s + g.monto, 0)
+  const hayDobleRetencion = totalRetenciones > 0 && retencionEnGastos > 0
+
+  // Honorarios — solo para mostrar en desglose (no afecta la distribución)
   const esHonorario = (g: Gasto) => g.descripcion.toLowerCase().includes('honorarios')
   const honorariosAdmin = gastos.filter(esHonorario).reduce((s, g) => s + g.monto, 0)
-  // Todos los demás gastos reducen el pool de todos por igual
-  const otrosGastos = gastos.filter(g => !esHonorario(g)).reduce((s, g) => s + g.monto, 0)
-  const totalGastos = honorariosAdmin + otrosGastos
 
-  // Pool base que se reparte por % de propiedad (los honorarios ya salieron aparte)
-  const poolPropietarios = totalArriendos + totalIngresosExtra - totalRetenciones - otrosGastos - tasaSeguridad - honorariosAdmin
-
-  // Neto total a distribuir (para mostrar en resumen)
-  const netoDistribuible = totalArriendos + totalIngresosExtra - totalRetenciones - otrosGastos - tasaSeguridad
-  // (honorariosAdmin ya está incluido en netoDistribuible: se resta de pool pero se suma a admin)
+  // Neto final a repartir entre propietarios
+  const netoDistribuible = totalArriendos + totalIngresosExtra - totalRetenciones - totalGastos - tasaSeguridad
 
   const propietariosConPct = propietarios.filter(p => (p.porcentaje_real ?? 0) > 0)
   const totalPct = propietariosConPct.reduce((s, p) => s + (p.porcentaje_real ?? 0), 0)
 
   const distribucion = propietariosConPct.map(p => {
-    const montoProp = Math.round(poolPropietarios * (p.porcentaje_real ?? 0) / 100)
-    const honorarios = p.es_administrador ? honorariosAdmin : 0
-    const monto = montoProp + honorarios
+    const monto = Math.round(netoDistribuible * (p.porcentaje_real ?? 0) / 100)
     const cuatromil = Math.round(monto * 0.004)
-    return { ...p, monto, cuatromil, neto: monto - cuatromil, montoProp, honorarios }
+    return { ...p, monto, cuatromil, neto: monto - cuatromil }
   })
 
   const totalDistribuido = distribucion.reduce((s, d) => s + d.monto, 0)
   const cajaMenor = netoDistribuible - totalDistribuido
+  const periodoLabel = periodo ? `${MESES[periodo.mes - 1]} ${periodo.anio}` : ''
 
   function imprimir() {
     if (!periodo) return
-    const rows = distribucion.map(d => {
-      const detalle = (d.es_administrador && d.honorarios > 0)
-        ? `<div style="font-size:11px;color:#78614A;margin-top:2px">Honorarios admin (10%): ${formatCOP(d.honorarios)} + Propiedad ${d.porcentaje_real}%: ${formatCOP(d.montoProp)}</div>`
-        : ''
-      return `
+    const rows = distribucion.map(d => `
       <tr>
-        <td>${d.nombre}${d.es_administrador ? ' <span style="font-size:10px;background:#FEF3C7;padding:1px 4px;border-radius:3px">Administradora</span>' : ''}${detalle}</td>
+        <td>${d.nombre}${d.es_administrador ? ' <span style="font-size:10px;background:#FEF3C7;padding:1px 4px;border-radius:3px">Administ.</span>' : ''}</td>
         <td style="text-align:right">${d.porcentaje_real}%</td>
-        <td style="text-align:right">${formatCOP(d.monto)}</td>
-        <td style="text-align:right;color:#a16207">−${formatCOP(d.cuatromil)}</td>
-        <td style="text-align:right;font-weight:600">${formatCOP(d.neto)}</td>
+        <td style="text-align:right">${fmt(d.monto)}</td>
+        <td style="text-align:right;color:#a16207">−${fmt(d.cuatromil)}</td>
+        <td style="text-align:right;font-weight:600">${fmt(d.neto)}</td>
         <td style="font-size:11px">${[d.banco, d.tipo_cuenta, d.numero_cuenta].filter(Boolean).join(' · ')}${d.nequi ? ` | Nequi: ${d.nequi}` : ''}</td>
-      </tr>`
-    }).join('')
-
-    const extraRows = ingresos.length > 0
-      ? ingresos.map(i => `<tr><td colspan="5" style="color:#15803d">+ ${i.descripcion}</td><td style="text-align:right;color:#15803d">${formatCOP(i.monto)}</td></tr>`).join('')
-      : ''
+      </tr>`).join('')
 
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
 <title>Distribución ${MESES[periodo.mes - 1]} ${periodo.anio}</title>
@@ -175,25 +169,22 @@ td{padding:9px 6px 9px 0;border-bottom:1px solid #F0EBE3;font-size:13px;vertical
 <h1>Casa <span>La37</span> — Distribución</h1>
 <p class="sub">${MESES[periodo.mes - 1]} ${periodo.anio} · ${new Date().toLocaleDateString('es-CO')}</p>
 <div class="grid">
-<div class="box"><label>Arriendos</label><div class="val">${formatCOP(totalArriendos)}</div></div>
-${totalIngresosExtra > 0 ? `<div class="box"><label>Ingresos extra</label><div class="val" style="color:#15803d">+${formatCOP(totalIngresosExtra)}</div></div>` : ''}
-<div class="box"><label>Retenciones + Gastos edificio</label><div class="val" style="color:#a16207">−${formatCOP(totalRetenciones + otrosGastos + tasaSeguridad)}</div></div>
-<div class="box"><label>Neto a distribuir</label><div class="val" style="color:#9A7B35">${formatCOP(netoDistribuible)}</div></div>
+<div class="box"><label>Arriendos</label><div class="val">${fmt(totalArriendos)}</div></div>
+${totalIngresosExtra > 0 ? `<div class="box"><label>Ingresos extra</label><div class="val" style="color:#15803d">+${fmt(totalIngresosExtra)}</div></div>` : ''}
+<div class="box"><label>Gastos totales</label><div class="val" style="color:#a16207">−${fmt(totalRetenciones + totalGastos + tasaSeguridad)}</div></div>
+<div class="box"><label>Neto a distribuir</label><div class="val" style="color:#9A7B35">${fmt(netoDistribuible)}</div></div>
 </div>
-${honorariosAdmin > 0 ? `<div style="background:#FEF3C7;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#92400E">
-  <strong>Honorarios de administración (10%):</strong> ${formatCOP(honorariosAdmin)} → se pagan directamente a la administradora antes de repartir.<br/>
-  Pool para distribución por propiedad: ${formatCOP(poolPropietarios)}
+${honorariosAdmin > 0 ? `<div style="background:#FEF9F0;border:1px solid #E8D5A3;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#78614A">
+  Honorarios de administración: ${fmt(honorariosAdmin)} (10% — pagados por el edificio a la administradora como salida)
 </div>` : ''}
 <table><thead><tr><th>Propietario</th><th style="text-align:right">%</th><th style="text-align:right">Bruto</th><th style="text-align:right">4×mil</th><th style="text-align:right">Neto</th><th>Cuenta</th></tr></thead>
-<tbody>${extraRows}${rows}</tbody></table>
-${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caja menor: ${formatCOP(cajaMenor)}</p>` : ''}
+<tbody>${rows}</tbody></table>
+${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caja menor: ${fmt(cajaMenor)}</p>` : ''}
 <div class="footer">Casa La37 · Carrera 37 #10-37, Medellín</div>
 <script>window.onload=()=>window.print()</script></body></html>`
     const w = window.open('', '_blank')
     if (w) { w.document.write(html); w.document.close() }
   }
-
-  const periodoLabel = periodo ? `${MESES[periodo.mes - 1]} ${periodo.anio}` : ''
 
   return (
     <div>
@@ -228,66 +219,70 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
 
       {periodoId && facturas.length > 0 && (
         <>
+          {/* Alerta doble retención */}
+          {hayDobleRetencion && (
+            <div className="rounded-lg border px-4 py-3 mb-4 text-sm" style={{ backgroundColor: 'oklch(0.970 0.030 30)', borderColor: 'oklch(0.780 0.100 30)', color: 'oklch(0.480 0.150 30)' }}>
+              <strong>⚠️ Posible doble conteo de retención:</strong> Las facturas ya calculan la retención de Octus automáticamente ({fmt(totalRetenciones)}), y hay gastos manuales de retención ({fmt(retencionEnGastos)}). Elimina los gastos "Retención Octus" para evitar contarla dos veces.
+            </div>
+          )}
+
           {/* Cards resumen */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
             {[
               { label: 'Arriendos', value: totalArriendos, color: 'oklch(0.185 0.020 55)' },
               { label: 'Ingresos extra', value: totalIngresosExtra, color: '#16a34a', prefix: '+' },
               { label: 'Retenciones', value: -totalRetenciones, color: totalRetenciones > 0 ? 'oklch(0.600 0.140 50)' : 'oklch(0.560 0.012 68)' },
-              { label: 'Gastos edificio', value: -(otrosGastos + tasaSeguridad), color: (otrosGastos + tasaSeguridad) > 0 ? 'oklch(0.540 0.180 30)' : 'oklch(0.560 0.012 68)' },
+              { label: 'Gastos', value: -totalGastos - tasaSeguridad, color: totalGastos > 0 ? 'oklch(0.540 0.180 30)' : 'oklch(0.560 0.012 68)' },
               { label: 'Neto a distribuir', value: netoDistribuible, color: '#9A7B35', bold: true },
             ].map(card => (
               <div key={card.label} className="rounded-xl p-4 border" style={{ backgroundColor: '#FFF', borderColor: 'oklch(0.880 0.012 72)' }}>
                 <p className="text-xs uppercase tracking-wide mb-2" style={{ color: 'oklch(0.520 0.015 60)' }}>{card.label}</p>
                 <p className="text-base font-semibold" style={{ color: card.color, fontWeight: card.bold ? 700 : 600 }}>
                   {card.value < 0
-                    ? `−${formatCOP(-card.value)}`
-                    : `${(card as { prefix?: string }).prefix ?? ''}${formatCOP(card.value)}`}
+                    ? `−${fmt(-card.value)}`
+                    : `${(card as { prefix?: string }).prefix ?? ''}${fmt(card.value)}`}
                 </p>
               </div>
             ))}
           </div>
 
-          {/* Banner honorarios administración */}
+          {/* Honorarios banner */}
           {honorariosAdmin > 0 ? (
             <div className="rounded-xl border px-4 py-3 mb-6 flex items-center justify-between gap-3"
-              style={{ backgroundColor: 'oklch(0.975 0.025 80)', borderColor: 'oklch(0.860 0.060 80)' }}>
-              <div className="flex items-start gap-3 flex-1">
-                <span className="text-lg mt-0.5">🏛️</span>
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: 'oklch(0.450 0.100 65)' }}>
-                    Honorarios de administración (10%): {formatCOP(honorariosAdmin)}
-                  </p>
-                  <p className="text-xs mt-0.5" style={{ color: 'oklch(0.560 0.060 65)' }}>
-                    Se pagan <strong>primero</strong> a la administradora. Pool para reparto por propiedad: <strong>{formatCOP(poolPropietarios)}</strong>
-                  </p>
-                </div>
+              style={{ backgroundColor: 'oklch(0.975 0.020 72)', borderColor: 'oklch(0.860 0.040 72)' }}>
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'oklch(0.400 0.020 58)' }}>
+                  Honorarios administración (10%): <strong>{fmt(honorariosAdmin)}</strong> — incluidos en gastos, pagados a la administradora por el edificio
+                </p>
+                <p className="text-xs mt-0.5" style={{ color: 'oklch(0.560 0.015 60)' }}>
+                  Todos los propietarios (incluida Ximena) reciben su % del neto restante por igual.
+                </p>
               </div>
               <button
                 onClick={calcularHonorarios}
                 disabled={calculandoHonorarios}
                 className="text-xs px-3 py-1.5 rounded-lg border flex-shrink-0"
-                style={{ borderColor: 'oklch(0.700 0.100 75)', color: 'oklch(0.450 0.100 65)', backgroundColor: '#fff' }}
+                style={{ borderColor: 'oklch(0.700 0.020 72)', color: 'oklch(0.400 0.020 58)', backgroundColor: '#fff' }}
               >
                 {calculandoHonorarios ? 'Calculando...' : 'Recalcular'}
               </button>
             </div>
           ) : (
             <div className="rounded-xl border border-dashed px-4 py-3 mb-6 flex items-center justify-between gap-3"
-              style={{ borderColor: 'oklch(0.800 0.060 80)', backgroundColor: 'oklch(0.988 0.012 80)' }}>
+              style={{ borderColor: 'oklch(0.800 0.020 72)', backgroundColor: 'oklch(0.988 0.008 75)' }}>
               <div>
-                <p className="text-sm font-medium" style={{ color: 'oklch(0.450 0.100 65)' }}>
+                <p className="text-sm font-medium" style={{ color: 'oklch(0.400 0.020 58)' }}>
                   Honorarios de administración (10%) no calculados
                 </p>
-                <p className="text-xs mt-0.5" style={{ color: 'oklch(0.560 0.060 65)' }}>
-                  Base: arriendos + ingresos extra = <strong>{formatCOP(totalArriendos + totalIngresosExtra)}</strong> → 10% = <strong>{formatCOP(Math.round((totalArriendos + totalIngresosExtra) * 0.10))}</strong>
+                <p className="text-xs mt-0.5" style={{ color: 'oklch(0.560 0.015 60)' }}>
+                  Base: {fmt(totalArriendos + totalIngresosExtra)} → 10% = <strong>{fmt(Math.round((totalArriendos + totalIngresosExtra) * 0.10))}</strong>
                 </p>
               </div>
               <button
                 onClick={calcularHonorarios}
                 disabled={calculandoHonorarios || facturas.length === 0}
                 className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0 font-medium"
-                style={{ backgroundColor: 'oklch(0.700 0.100 75)', color: '#fff' }}
+                style={{ backgroundColor: 'oklch(0.520 0.020 58)', color: '#fff' }}
               >
                 {calculandoHonorarios ? 'Calculando...' : '+ Calcular honorarios'}
               </button>
@@ -310,7 +305,7 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
             </div>
             {ingresos.length === 0 ? (
               <p className="text-xs" style={{ color: 'oklch(0.560 0.012 68)' }}>
-                Sin ingresos extraordinarios este periodo. Úsalos para seguros, pagos retroactivos, multas, etc.
+                Sin ingresos extraordinarios este periodo.
               </p>
             ) : (
               <div className="space-y-2">
@@ -318,17 +313,13 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
                   <div key={ing.id} className="flex items-center justify-between">
                     <span className="text-sm" style={{ color: 'oklch(0.300 0.018 58)' }}>{ing.descripcion}</span>
                     <div className="flex items-center gap-3">
-                      <span className="font-semibold text-sm" style={{ color: '#16a34a' }}>+{formatCOP(ing.monto)}</span>
-                      <button
-                        onClick={() => setIngModal({ id: ing.id, descripcion: ing.descripcion, monto: ing.monto.toString() })}
+                      <span className="font-semibold text-sm" style={{ color: '#16a34a' }}>+{fmt(ing.monto)}</span>
+                      <button onClick={() => setIngModal({ id: ing.id, descripcion: ing.descripcion, monto: ing.monto.toString() })}
                         className="text-xs px-2 py-0.5 rounded border"
-                        style={{ borderColor: 'oklch(0.880 0.012 72)', color: 'oklch(0.520 0.015 60)' }}
-                      >Editar</button>
-                      <button
-                        onClick={() => eliminarIngreso(ing.id)}
+                        style={{ borderColor: 'oklch(0.880 0.012 72)', color: 'oklch(0.520 0.015 60)' }}>Editar</button>
+                      <button onClick={() => eliminarIngreso(ing.id)}
                         className="text-xs px-2 py-0.5 rounded border"
-                        style={{ borderColor: 'oklch(0.880 0.040 30)', color: 'oklch(0.540 0.180 30)' }}
-                      >×</button>
+                        style={{ borderColor: 'oklch(0.880 0.040 30)', color: 'oklch(0.540 0.180 30)' }}>×</button>
                     </div>
                   </div>
                 ))}
@@ -343,27 +334,33 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
               <div className="space-y-1.5">
                 {gastos.map(g => (
                   <div key={g.id} className="flex justify-between text-sm">
-                    <span style={{ color: esHonorario(g) ? 'oklch(0.450 0.100 65)' : 'oklch(0.400 0.018 58)' }}>
+                    <span style={{ color: esHonorario(g) ? 'oklch(0.450 0.060 58)' : 'oklch(0.400 0.018 58)' }}>
                       {g.descripcion}
                       {esHonorario(g) && (
                         <span className="ml-2 text-xs px-1.5 py-0.5 rounded"
-                          style={{ backgroundColor: 'oklch(0.975 0.025 80)', color: 'oklch(0.450 0.100 65)' }}>
+                          style={{ backgroundColor: 'oklch(0.965 0.020 72)', color: 'oklch(0.450 0.060 58)' }}>
                           → Administradora
                         </span>
                       )}
+                      {g.descripcion.toLowerCase().includes('retenci') && totalRetenciones > 0 && (
+                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded"
+                          style={{ backgroundColor: 'oklch(0.970 0.030 30)', color: 'oklch(0.480 0.150 30)' }}>
+                          ⚠️ doble conteo
+                        </span>
+                      )}
                     </span>
-                    <span style={{ color: 'oklch(0.300 0.018 58)' }}>{formatCOP(g.monto)}</span>
+                    <span style={{ color: 'oklch(0.300 0.018 58)' }}>{fmt(g.monto)}</span>
                   </div>
                 ))}
                 {tasaSeguridad > 0 && (
                   <div className="flex justify-between text-sm">
                     <span style={{ color: 'oklch(0.600 0.140 50)' }}>Tasa de Seguridad (Gobernación)</span>
-                    <span style={{ color: 'oklch(0.600 0.140 50)' }}>{formatCOP(tasaSeguridad)}</span>
+                    <span style={{ color: 'oklch(0.600 0.140 50)' }}>{fmt(tasaSeguridad)}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm font-semibold pt-1.5 border-t" style={{ borderColor: 'oklch(0.880 0.012 72)' }}>
                   <span style={{ color: 'oklch(0.185 0.020 55)' }}>Total gastos</span>
-                  <span style={{ color: 'oklch(0.540 0.180 30)' }}>{formatCOP(totalGastos + tasaSeguridad)}</span>
+                  <span style={{ color: 'oklch(0.540 0.180 30)' }}>{fmt(totalGastos + tasaSeguridad)}</span>
                 </div>
               </div>
             </div>
@@ -372,7 +369,7 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
           {/* Distribución */}
           {propietariosConPct.length === 0 ? (
             <div className="rounded-lg px-4 py-3 text-sm" style={{ backgroundColor: 'oklch(0.960 0.040 60)', color: 'oklch(0.540 0.120 50)' }}>
-              Los propietarios no tienen porcentaje configurado. Ve a <strong>Propietarios</strong> y asigna el % a cada uno.
+              Los propietarios no tienen porcentaje configurado.
             </div>
           ) : (
             <>
@@ -385,43 +382,23 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
 
               <div className="grid gap-3 mb-6">
                 {distribucion.map(d => (
-                  <div
-                    key={d.id}
-                    className="rounded-xl border px-5 py-4"
-                    style={{
-                      backgroundColor: '#FFF',
-                      borderColor: d.es_administrador ? 'oklch(0.860 0.060 80)' : 'oklch(0.880 0.012 72)',
-                    }}
-                  >
+                  <div key={d.id} className="rounded-xl border px-5 py-4"
+                    style={{ backgroundColor: '#FFF', borderColor: 'oklch(0.880 0.012 72)' }}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <p className="font-semibold" style={{ color: 'oklch(0.185 0.020 55)' }}>{d.nombre}</p>
-                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: 'oklch(0.945 0.012 72)', color: 'oklch(0.520 0.015 60)' }}>
+                          <span className="text-xs px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: 'oklch(0.945 0.012 72)', color: 'oklch(0.520 0.015 60)' }}>
                             {d.porcentaje_real}%
                           </span>
                           {d.es_administrador && (
-                            <span className="text-xs px-1.5 py-0.5 rounded font-medium"
-                              style={{ backgroundColor: 'oklch(0.975 0.025 80)', color: 'oklch(0.450 0.100 65)' }}>
+                            <span className="text-xs px-1.5 py-0.5 rounded"
+                              style={{ backgroundColor: 'oklch(0.965 0.020 72)', color: 'oklch(0.450 0.060 58)' }}>
                               Administradora
                             </span>
                           )}
                         </div>
-
-                        {/* Desglose para la administradora */}
-                        {d.es_administrador && d.honorarios > 0 && (
-                          <div className="text-xs mb-1.5 space-y-0.5">
-                            <div className="flex gap-1" style={{ color: 'oklch(0.450 0.100 65)' }}>
-                              <span>Honorarios admin (10%):</span>
-                              <span className="font-medium">{formatCOP(d.honorarios)}</span>
-                            </div>
-                            <div className="flex gap-1" style={{ color: 'oklch(0.400 0.018 58)' }}>
-                              <span>Propiedad {d.porcentaje_real}%:</span>
-                              <span className="font-medium">{formatCOP(d.montoProp)}</span>
-                            </div>
-                          </div>
-                        )}
-
                         {(d.banco || d.tipo_cuenta || d.numero_cuenta) && (
                           <p className="text-xs" style={{ color: 'oklch(0.520 0.015 60)' }}>
                             {[d.banco, d.tipo_cuenta, d.numero_cuenta].filter(Boolean).join(' · ')}
@@ -429,12 +406,12 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
                         )}
                         {d.nequi && <p className="text-xs" style={{ color: '#25D366' }}>Nequi: {d.nequi}</p>}
                         <p className="text-xs mt-1.5" style={{ color: 'oklch(0.560 0.012 68)' }}>
-                          4×mil: −{formatCOP(d.cuatromil)} →{' '}
-                          <strong style={{ color: 'oklch(0.300 0.018 58)' }}>transferir {formatCOP(d.neto)}</strong>
+                          4×mil: −{fmt(d.cuatromil)} →{' '}
+                          <strong style={{ color: 'oklch(0.300 0.018 58)' }}>transferir {fmt(d.neto)}</strong>
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-2xl font-semibold" style={{ color: '#9A7B35' }}>{formatCOP(d.monto)}</p>
+                        <p className="text-2xl font-semibold" style={{ color: '#9A7B35' }}>{fmt(d.monto)}</p>
                         <p className="text-xs" style={{ color: 'oklch(0.560 0.012 68)' }}>bruto</p>
                       </div>
                     </div>
@@ -443,16 +420,12 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
               </div>
 
               {cajaMenor !== 0 && (
-                <div className="rounded-lg border px-4 py-3 flex items-center justify-between text-sm" style={{ borderColor: 'oklch(0.880 0.012 72)', backgroundColor: 'oklch(0.980 0.008 75)' }}>
+                <div className="rounded-lg border px-4 py-3 flex items-center justify-between text-sm"
+                  style={{ borderColor: 'oklch(0.880 0.012 72)', backgroundColor: 'oklch(0.980 0.008 75)' }}>
                   <span style={{ color: 'oklch(0.400 0.018 58)' }}>Caja menor (sobrante por redondeo)</span>
-                  <span className="font-semibold" style={{ color: 'oklch(0.300 0.018 58)' }}>{formatCOP(cajaMenor)}</span>
+                  <span className="font-semibold" style={{ color: 'oklch(0.300 0.018 58)' }}>{fmt(cajaMenor)}</span>
                 </div>
               )}
-
-              <div className="mt-6 rounded-lg px-4 py-3 text-xs" style={{ backgroundColor: 'oklch(0.960 0.020 72)', color: 'oklch(0.520 0.015 60)' }}>
-                <strong>¿Por qué cambia qué local "le paga" a qué propietario cada mes?</strong><br />
-                Todos los propietarios son dueños del edificio completo, no de locales específicos. La app siempre calcula el neto total y lo distribuye exactamente según el porcentaje de cada uno. Los montos que ves aquí son los que debes transferir directamente a cada cuenta, independientemente de qué local pagó.
-              </div>
             </>
           )}
         </>
@@ -465,31 +438,23 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
             <DialogTitle>{ingModal?.id ? 'Editar ingreso' : 'Nuevo ingreso extraordinario'}</DialogTitle>
           </DialogHeader>
           <p className="text-xs" style={{ color: 'oklch(0.520 0.015 60)' }}>
-            Úsalo para pagos de seguros, retroactivos, multas por mora, o cualquier ingreso que no sea arriendo mensual regular.
+            Para seguros, retroactivos, multas por mora, o cualquier ingreso fuera del arriendo regular.
           </p>
           <div className="space-y-3">
             <div>
               <Label>Descripción</Label>
-              <Input
-                placeholder="Ej: Pago SURA seguro local 205"
+              <Input placeholder="Ej: Pago SURA seguro local 205"
                 value={ingModal?.descripcion ?? ''}
-                onChange={e => setIngModal(prev => prev ? { ...prev, descripcion: e.target.value } : null)}
-              />
+                onChange={e => setIngModal(prev => prev ? { ...prev, descripcion: e.target.value } : null)} />
             </div>
             <div>
               <Label>Monto ($)</Label>
-              <Input
-                type="number"
-                placeholder="0"
+              <Input type="number" placeholder="0"
                 value={ingModal?.monto ?? ''}
-                onChange={e => setIngModal(prev => prev ? { ...prev, monto: e.target.value } : null)}
-              />
+                onChange={e => setIngModal(prev => prev ? { ...prev, monto: e.target.value } : null)} />
             </div>
-            <Button
-              className="w-full"
-              onClick={guardarIngreso}
-              disabled={savingIng || !ingModal?.descripcion || !ingModal?.monto}
-            >
+            <Button className="w-full" onClick={guardarIngreso}
+              disabled={savingIng || !ingModal?.descripcion || !ingModal?.monto}>
               {savingIng ? 'Guardando...' : ingModal?.id ? 'Guardar cambios' : 'Agregar ingreso'}
             </Button>
           </div>

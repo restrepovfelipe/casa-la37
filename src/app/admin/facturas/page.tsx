@@ -15,14 +15,14 @@ function whatsAppArriendo(factura: Factura & { locales: Local; periodos: Periodo
   const local = factura.locales
   const periodo = factura.periodos
 
-  const texto = `🏢 *Casa La37 — ${local?.numero}${local?.nombre ? ` ${local.nombre}` : ''}*
-📅 *${MESES[periodo.mes - 1]} ${periodo.anio}*
+  const texto = `*Casa La37 — ${local?.numero}${local?.nombre ? ` ${local.nombre}` : ''}*
+*Arriendo ${MESES[periodo.mes - 1]} ${periodo.anio}*
 
-🏠 *Arriendo del mes: ${formatCOP(factura.arriendo)}*
+*${formatCOP(factura.arriendo)}*
 
-Por favor realizar el pago a más tardar el día 1 del mes.
+Por favor realizar el pago a mas tardar el dia 1 del mes.
 
-_Carrera 37 #10-37, Medellín_`
+_Carrera 37 #10-37, Medellin_`
 
   const tel = telefono ? `57${telefono.replace(/\D/g, '')}` : ''
   window.open(`https://wa.me/${tel}?text=${encodeURIComponent(texto)}`, '_blank')
@@ -35,17 +35,17 @@ function whatsAppServicios(factura: Factura & { locales: Local; periodos: Period
     ? `\n📆 Fecha límite: ${new Date(periodo.fecha_limite_pago + 'T12:00:00').toLocaleDateString('es-CO')}`
     : ''
 
-  const texto = `🏢 *Casa La37 — ${local?.numero}${local?.nombre ? ` ${local.nombre}` : ''}*
-📅 *Servicios ${MESES[periodo.mes - 1]} ${periodo.anio}*
+  const texto = `*Casa La37 — ${local?.numero}${local?.nombre ? ` ${local.nombre}` : ''}*
+*Servicios ${MESES[periodo.mes - 1]} ${periodo.anio}*
 
-💧 Agua: ${formatCOP(factura.agua_total)}
-⚡ Energía: ${formatCOP(factura.luz_total)}
-🔒 Alarmar: ${formatCOP(factura.alarma_total)}
-🧹 Empleada: ${formatCOP(factura.empleada_total)}
-━━━━━━━━━━━━━━━━
-📋 *Total servicios: ${formatCOP(factura.total_servicios)}*${limite}
+• Agua: ${formatCOP(factura.agua_total)}
+• Energia: ${formatCOP(factura.luz_total)}
+• Alarmar: ${formatCOP(factura.alarma_total)}
+• Empleada: ${formatCOP(factura.empleada_total)}
 
-_Carrera 37 #10-37, Medellín_`
+*Total servicios: ${formatCOP(factura.total_servicios)}*${limite}
+
+_Carrera 37 #10-37, Medellin_`
 
   const tel = telefono ? `57${telefono.replace(/\D/g, '')}` : ''
   window.open(`https://wa.me/${tel}?text=${encodeURIComponent(texto)}`, '_blank')

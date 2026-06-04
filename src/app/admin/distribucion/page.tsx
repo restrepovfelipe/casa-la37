@@ -20,17 +20,21 @@ export default function DistribucionPage() {
   const [ingModal, setIngModal] = useState<{ id?: string; descripcion: string; monto: string } | null>(null)
   const [savingIng, setSavingIng] = useState(false)
   const [calculandoHonorarios, setCalculandoHonorarios] = useState(false)
+  const [guardandoCaja, setGuardandoCaja] = useState(false)
 
   const supabase = createClient()
 
-  useEffect(() => {
-    Promise.all([
+  async function cargarPeriodos() {
+    const [{ data: per }, { data: props }] = await Promise.all([
       supabase.from('periodos').select('*').order('anio', { ascending: false }).order('mes', { ascending: false }),
       supabase.from('propietarios').select('*').order('nombre'),
-    ]).then(([{ data: per }, { data: props }]) => {
-      if (per) setPeriodos(per)
-      if (props) setPropietarios(props)
-    })
+    ])
+    if (per) setPeriodos(per)
+    if (props) setPropietarios(props)
+  }
+
+  useEffect(() => {
+    cargarPeriodos()
   }, [])
 
   useEffect(() => {
@@ -95,8 +99,23 @@ export default function DistribucionPage() {
     await cargarDatos()
   }
 
+  async function guardarCajaMenor(valor: number) {
+    setGuardandoCaja(true)
+    await supabase.from('periodos').update({ caja_menor: valor }).eq('id', periodoId)
+    await cargarPeriodos()
+    // Re-sync periodo local
+    setPeriodo(prev => prev ? { ...prev, caja_menor: valor } : prev)
+    setGuardandoCaja(false)
+  }
+
   const fmt = (n: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
+
+  // ── Caja menor del mes anterior ────────────────────────────────────────────
+  const mesPrev = periodo ? (periodo.mes === 1 ? 12 : periodo.mes - 1) : 0
+  const anioPrev = periodo ? (periodo.mes === 1 ? periodo.anio - 1 : periodo.anio) : 0
+  const periodoPrev = periodos.find(p => p.mes === mesPrev && p.anio === anioPrev)
+  const cajaMenorAnterior = periodoPrev?.caja_menor ?? 0
 
   // ── Cálculo ──────────────────────────────────────────────────────────────────
   const totalArriendos = facturas.reduce((s, f) => s + f.arriendo, 0)
@@ -115,8 +134,8 @@ export default function DistribucionPage() {
   // Honorarios — para mostrar en desglose y en panel de la administradora
   const honorariosAdmin = gastosEfectivos.filter(esHonorario).reduce((s, g) => s + g.monto, 0)
 
-  // Neto final = arriendos + extras - retenciones(auto) - gastos(sin retención manual) - tasa
-  const netoDistribuible = totalArriendos + totalIngresosExtra - totalRetenciones - totalGastos - tasaSeguridad
+  // Neto final = arriendos + extras + caja_menor_anterior - retenciones(auto) - gastos(sin retención manual) - tasa
+  const netoDistribuible = totalArriendos + totalIngresosExtra + cajaMenorAnterior - totalRetenciones - totalGastos - tasaSeguridad
 
   const propietariosConPct = propietarios.filter(p => (p.porcentaje_real ?? 0) > 0)
   const totalPct = propietariosConPct.reduce((s, p) => s + (p.porcentaje_real ?? 0), 0)
@@ -124,13 +143,15 @@ export default function DistribucionPage() {
   const distribucion = propietariosConPct.map(p => {
     const monto = Math.round(netoDistribuible * (p.porcentaje_real ?? 0) / 100)
     const cuatromil = Math.round(monto * 0.004)
-    // La administradora también recibe los honorarios (pagados por el edificio aparte)
     const honorarios = p.es_administrador ? honorariosAdmin : 0
     return { ...p, monto, cuatromil, neto: monto - cuatromil, honorarios }
   })
 
   const totalDistribuido = distribucion.reduce((s, d) => s + d.monto, 0)
   const cajaMenor = netoDistribuible - totalDistribuido
+  const cajaMenorGuardada = periodo?.caja_menor ?? 0
+  const cajaMenorYaGuardada = cajaMenorGuardada === cajaMenor
+
   const periodoLabel = periodo ? `${MESES[periodo.mes - 1]} ${periodo.anio}` : ''
 
   function imprimir() {
@@ -162,6 +183,7 @@ td{padding:9px 6px 9px 0;border-bottom:1px solid #F0EBE3;font-size:13px;vertical
 <div class="grid">
 <div class="box"><label>Arriendos</label><div class="val">${fmt(totalArriendos)}</div></div>
 ${totalIngresosExtra > 0 ? `<div class="box"><label>Ingresos extra</label><div class="val" style="color:#15803d">+${fmt(totalIngresosExtra)}</div></div>` : ''}
+${cajaMenorAnterior > 0 ? `<div class="box"><label>Caja menor anterior</label><div class="val" style="color:#15803d">+${fmt(cajaMenorAnterior)}</div></div>` : ''}
 <div class="box"><label>Gastos totales</label><div class="val" style="color:#a16207">−${fmt(totalRetenciones + totalGastos + tasaSeguridad)}</div></div>
 <div class="box"><label>Neto a distribuir</label><div class="val" style="color:#9A7B35">${fmt(netoDistribuible)}</div></div>
 </div>
@@ -221,11 +243,12 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
             {[
               { label: 'Arriendos', value: totalArriendos, color: 'oklch(0.185 0.020 55)' },
-              { label: 'Ingresos extra', value: totalIngresosExtra, color: '#16a34a', prefix: '+' },
+              { label: 'Ingresos extra', value: totalIngresosExtra, color: '#16a34a', prefix: '+', hide: totalIngresosExtra === 0 },
+              { label: cajaMenorAnterior > 0 ? `Caja menor ${MESES[mesPrev - 1].toLowerCase()}` : '', value: cajaMenorAnterior, color: '#16a34a', prefix: '+', hide: cajaMenorAnterior === 0 },
               { label: 'Retenciones', value: -totalRetenciones, color: totalRetenciones > 0 ? 'oklch(0.600 0.140 50)' : 'oklch(0.560 0.012 68)' },
               { label: 'Gastos', value: -totalGastos - tasaSeguridad, color: totalGastos > 0 ? 'oklch(0.540 0.180 30)' : 'oklch(0.560 0.012 68)' },
               { label: 'Neto a distribuir', value: netoDistribuible, color: '#9A7B35', bold: true },
-            ].map(card => (
+            ].filter(card => !card.hide && card.label).map(card => (
               <div key={card.label} className="rounded-xl p-4 border" style={{ backgroundColor: '#FFF', borderColor: 'oklch(0.880 0.012 72)' }}>
                 <p className="text-xs uppercase tracking-wide mb-2" style={{ color: 'oklch(0.520 0.015 60)' }}>{card.label}</p>
                 <p className="text-base font-semibold" style={{ color: card.color, fontWeight: card.bold ? 700 : 600 }}>
@@ -436,13 +459,34 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
                 ))}
               </div>
 
-              {cajaMenor !== 0 && (
-                <div className="rounded-lg border px-4 py-3 flex items-center justify-between text-sm"
-                  style={{ borderColor: 'oklch(0.880 0.012 72)', backgroundColor: 'oklch(0.980 0.008 75)' }}>
-                  <span style={{ color: 'oklch(0.400 0.018 58)' }}>Caja menor (sobrante por redondeo)</span>
-                  <span className="font-semibold" style={{ color: 'oklch(0.300 0.018 58)' }}>{fmt(cajaMenor)}</span>
+              {/* Caja menor */}
+              <div className="rounded-lg border px-4 py-3 flex items-center justify-between gap-4 text-sm"
+                style={{ borderColor: cajaMenorYaGuardada ? 'oklch(0.800 0.040 145)' : 'oklch(0.880 0.012 72)', backgroundColor: cajaMenorYaGuardada ? 'oklch(0.975 0.015 145)' : 'oklch(0.980 0.008 75)' }}>
+                <div>
+                  <p className="font-medium" style={{ color: 'oklch(0.300 0.018 58)' }}>
+                    Caja menor {periodoLabel}
+                    {cajaMenorYaGuardada && (
+                      <span className="ml-2 text-xs" style={{ color: 'oklch(0.450 0.080 145)' }}>✓ guardada</span>
+                    )}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'oklch(0.560 0.012 68)' }}>
+                    Se arrastra como ingreso al siguiente mes ({cajaMenorAnterior > 0 ? `${MESES[mesPrev - 1]} aportó ${fmt(cajaMenorAnterior)}` : 'nada aportado del mes anterior'})
+                  </p>
                 </div>
-              )}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-base font-semibold" style={{ color: 'oklch(0.300 0.018 58)' }}>{fmt(cajaMenor)}</span>
+                  {!cajaMenorYaGuardada && (
+                    <button
+                      onClick={() => guardarCajaMenor(cajaMenor)}
+                      disabled={guardandoCaja}
+                      className="text-xs px-3 py-1.5 rounded-lg font-medium"
+                      style={{ backgroundColor: 'oklch(0.520 0.020 58)', color: '#fff' }}
+                    >
+                      {guardandoCaja ? 'Guardando...' : 'Guardar para el siguiente mes'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </>
           )}
         </>

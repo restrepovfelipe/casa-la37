@@ -54,6 +54,7 @@ export type Periodo = {
   empleada: number
   dias_aide: number | null
   tasa_seguridad: number
+  caja_menor: number | null
   fecha_limite_pago: string | null
   created_at: string
 }

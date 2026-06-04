@@ -144,19 +144,18 @@ function imprimir(factura: Factura & { locales: Local; periodos: Periodo }, form
   <script>window.onload = () => { window.print(); }</script>
 </body>
 </html>`
-  // Usar iframe en lugar de popup para evitar bloqueo de popups
+  const htmlForPrint = html.replace(/<script[\s\S]*?<\/script>/gi, '')
   const iframe = document.createElement('iframe')
   iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:0;'
+  iframe.addEventListener('load', function () {
+    try {
+      this.contentWindow?.focus()
+      this.contentWindow?.print()
+    } catch (e) { console.error('print error', e) }
+    setTimeout(() => { try { document.body.removeChild(iframe) } catch (_) {} }, 5000)
+  })
+  iframe.srcdoc = htmlForPrint
   document.body.appendChild(iframe)
-  const doc = iframe.contentDocument!
-  doc.open()
-  doc.write(html.replace('<script>window.onload = () => { window.print(); }</script>', ''))
-  doc.close()
-  setTimeout(() => {
-    iframe.contentWindow?.focus()
-    iframe.contentWindow?.print()
-    setTimeout(() => { try { document.body.removeChild(iframe) } catch (_) {} }, 3000)
-  }, 400)
 }
 
 export default function FacturasPage() {

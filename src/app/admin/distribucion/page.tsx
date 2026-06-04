@@ -195,8 +195,18 @@ ${honorariosAdmin > 0 ? `<div style="background:#FEF9F0;border:1px solid #E8D5A3
 ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caja menor: ${fmt(cajaMenor)}</p>` : ''}
 <div class="footer">Casa La37 · Carrera 37 #10-37, Medellín</div>
 <script>window.onload=()=>window.print()</script></body></html>`
-    const w = window.open('', '_blank')
-    if (w) { w.document.write(html); w.document.close() }
+    const iframe = document.createElement('iframe')
+    iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:0;'
+    document.body.appendChild(iframe)
+    const doc = iframe.contentDocument!
+    doc.open()
+    doc.write(html.replace('<script>window.onload=()=>window.print()</script>', ''))
+    doc.close()
+    setTimeout(() => {
+      iframe.contentWindow?.focus()
+      iframe.contentWindow?.print()
+      setTimeout(() => { try { document.body.removeChild(iframe) } catch (_) {} }, 3000)
+    }, 400)
   }
 
   return (

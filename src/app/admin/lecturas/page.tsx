@@ -118,7 +118,9 @@ export default function LecturasPage() {
         <Label>Seleccionar periodo</Label>
         <Select value={periodoId} onValueChange={(v) => setPeriodoId(v ?? '')}>
           <SelectTrigger>
-            <SelectValue placeholder="Seleccionar periodo..." />
+            <span style={{ color: periodoId && periodos.find(p => p.id === periodoId) ? undefined : 'oklch(0.560 0.012 68)' }}>
+              {(() => { const p = periodos.find(x => x.id === periodoId); return p ? `${MESES[p.mes - 1]} ${p.anio}` : 'Seleccionar periodo...' })()}
+            </span>
           </SelectTrigger>
           <SelectContent>
             {periodos.map(p => (

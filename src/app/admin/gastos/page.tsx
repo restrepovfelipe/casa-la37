@@ -103,7 +103,11 @@ export default function GastosPage() {
       <div className="mb-6 max-w-xs">
         <Label>Seleccionar periodo</Label>
         <Select value={periodoId} onValueChange={v => setPeriodoId(v ?? '')}>
-          <SelectTrigger><SelectValue placeholder="Seleccionar periodo..." /></SelectTrigger>
+          <SelectTrigger>
+            <span style={{ color: periodoId && periodoActual ? undefined : 'oklch(0.560 0.012 68)' }}>
+              {periodoActual ? `${MESES[periodoActual.mes - 1]} ${periodoActual.anio}` : 'Seleccionar periodo...'}
+            </span>
+          </SelectTrigger>
           <SelectContent>
             {periodos.map(p => (
               <SelectItem key={p.id} value={p.id}>{MESES[p.mes - 1]} {p.anio}</SelectItem>

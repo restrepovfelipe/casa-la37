@@ -51,9 +51,10 @@ _Carrera 37 #10-37, Medellín_`
   window.open(`https://wa.me/${tel}?text=${encodeURIComponent(texto)}`, '_blank')
 }
 
-function imprimir(factura: Factura & { locales: Local; periodos: Periodo }, formatCOP: (n: number) => string) {
+function imprimir(factura: Factura & { locales: Local; periodos?: Periodo }, formatCOP: (n: number) => string) {
   const local = factura.locales
   const periodo = factura.periodos
+  if (!periodo) return
   const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -207,7 +208,7 @@ export default function FacturasPage() {
   async function cargarFacturas() {
     const { data } = await supabase
       .from('facturas')
-      .select('*, locales(*, propietarios(*))')
+      .select('*, locales(*, propietarios(*)), periodos(*)')
       .eq('periodo_id', periodoId)
       .order('locales(numero)')
     if (data) setFacturas(data as (Factura & { locales: Local })[])

@@ -144,18 +144,26 @@ function imprimir(factura: Factura & { locales: Local; periodos: Periodo }, form
   <script>window.onload = () => { window.print(); }</script>
 </body>
 </html>`
-  const htmlForPrint = html.replace(/<script[\s\S]*?<\/script>/gi, '')
-  const iframe = document.createElement('iframe')
-  iframe.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;height:297mm;border:0;'
-  iframe.addEventListener('load', function () {
-    try {
-      this.contentWindow?.focus()
-      this.contentWindow?.print()
-    } catch (e) { console.error('print error', e) }
-    setTimeout(() => { try { document.body.removeChild(iframe) } catch (_) {} }, 5000)
-  })
-  iframe.srcdoc = htmlForPrint
-  document.body.appendChild(iframe)
+  // Inyectar contenido en el DOM actual y llamar window.print() directamente
+  // (evita popup blocker e iframe restrictions en Chrome/Safari)
+  const styles = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? ''
+  const body   = html.match(/<body>([\s\S]*?)<\/body>/)?.[1]?.replace(/<script[\s\S]*?<\/script>/gi, '') ?? ''
+
+  const overlay = document.createElement('div')
+  overlay.id = 'clp-print'
+  overlay.innerHTML = body
+
+  const styleEl = document.createElement('style')
+  styleEl.textContent = styles +
+    '@media print{body>*:not(#clp-print){display:none!important}#clp-print{display:block!important}}' +
+    '@media screen{#clp-print{display:none!important}}'
+
+  document.head.appendChild(styleEl)
+  document.body.appendChild(overlay)
+
+  const cleanup = () => { styleEl.remove(); overlay.remove() }
+  window.addEventListener('afterprint', cleanup, { once: true })
+  window.print()
 }
 
 export default function FacturasPage() {

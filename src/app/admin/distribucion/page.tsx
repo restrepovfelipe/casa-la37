@@ -99,34 +99,23 @@ export default function DistribucionPage() {
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
 
   // ── Cálculo ──────────────────────────────────────────────────────────────────
-  // Modelo correcto según Excel:
-  // 1. Ingresos = arriendos + ingresos extraordinarios
-  // 2. Gastos = TODOS los gastos del edificio, incluidos honorarios de administración
-  //    (los honorarios se pagan a Ximena como factura de administración, no como parte
-  //     de la distribución de propietarios)
-  // 3. Neto = Ingresos - Retenciones(facturas) - Gastos - Tasa seguridad
-  // 4. Cada propietario = Neto × su_porcentaje (TODOS igual, incluyendo Ximena)
-  //
-  // IMPORTANTE: No ingresar "Retención Octus" como gasto manual si ya está calculada
-  // en las facturas — se contaría doble.
-
   const totalArriendos = facturas.reduce((s, f) => s + f.arriendo, 0)
   const totalRetenciones = facturas.reduce((s, f) => s + (f.retencion_total ?? 0), 0)
   const totalIngresosExtra = ingresos.reduce((s, i) => s + i.monto, 0)
   const tasaSeguridad = periodo?.tasa_seguridad ?? 0
-  const totalGastos = gastos.reduce((s, g) => s + g.monto, 0)
 
-  // Detectar posible doble conteo de retención
-  const retencionEnGastos = gastos
-    .filter(g => g.descripcion.toLowerCase().includes('retenci'))
-    .reduce((s, g) => s + g.monto, 0)
-  const hayDobleRetencion = totalRetenciones > 0 && retencionEnGastos > 0
-
-  // Honorarios — solo para mostrar en desglose (no afecta la distribución)
   const esHonorario = (g: Gasto) => g.descripcion.toLowerCase().includes('honorarios')
-  const honorariosAdmin = gastos.filter(esHonorario).reduce((s, g) => s + g.monto, 0)
+  const esRetencionManual = (g: Gasto) => g.descripcion.toLowerCase().includes('retenci')
 
-  // Neto final a repartir entre propietarios
+  // Excluir retenciones manuales: las facturas ya las calculan automáticamente
+  const gastosEfectivos = gastos.filter(g => !esRetencionManual(g))
+  const totalGastos = gastosEfectivos.reduce((s, g) => s + g.monto, 0)
+  const retencionManualExcluida = gastos.filter(esRetencionManual).reduce((s, g) => s + g.monto, 0)
+
+  // Honorarios — para mostrar en desglose y en panel de la administradora
+  const honorariosAdmin = gastosEfectivos.filter(esHonorario).reduce((s, g) => s + g.monto, 0)
+
+  // Neto final = arriendos + extras - retenciones(auto) - gastos(sin retención manual) - tasa
   const netoDistribuible = totalArriendos + totalIngresosExtra - totalRetenciones - totalGastos - tasaSeguridad
 
   const propietariosConPct = propietarios.filter(p => (p.porcentaje_real ?? 0) > 0)
@@ -135,7 +124,9 @@ export default function DistribucionPage() {
   const distribucion = propietariosConPct.map(p => {
     const monto = Math.round(netoDistribuible * (p.porcentaje_real ?? 0) / 100)
     const cuatromil = Math.round(monto * 0.004)
-    return { ...p, monto, cuatromil, neto: monto - cuatromil }
+    // La administradora también recibe los honorarios (pagados por el edificio aparte)
+    const honorarios = p.es_administrador ? honorariosAdmin : 0
+    return { ...p, monto, cuatromil, neto: monto - cuatromil, honorarios }
   })
 
   const totalDistribuido = distribucion.reduce((s, d) => s + d.monto, 0)
@@ -219,10 +210,10 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
 
       {periodoId && facturas.length > 0 && (
         <>
-          {/* Alerta doble retención */}
-          {hayDobleRetencion && (
-            <div className="rounded-lg border px-4 py-3 mb-4 text-sm" style={{ backgroundColor: 'oklch(0.970 0.030 30)', borderColor: 'oklch(0.780 0.100 30)', color: 'oklch(0.480 0.150 30)' }}>
-              <strong>⚠️ Posible doble conteo de retención:</strong> Las facturas ya calculan la retención de Octus automáticamente ({fmt(totalRetenciones)}), y hay gastos manuales de retención ({fmt(retencionEnGastos)}). Elimina los gastos "Retención Octus" para evitar contarla dos veces.
+          {/* Info retención excluida */}
+          {retencionManualExcluida > 0 && (
+            <div className="rounded-lg border px-4 py-3 mb-4 text-sm" style={{ backgroundColor: 'oklch(0.975 0.015 75)', borderColor: 'oklch(0.860 0.020 72)', color: 'oklch(0.500 0.015 60)' }}>
+              Los gastos "Retención Octus" ({fmt(retencionManualExcluida)}) están excluidos del cálculo — las facturas ya la descuentan automáticamente ({fmt(totalRetenciones)}).
             </div>
           )}
 
@@ -332,26 +323,31 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
             <div className="rounded-xl border p-4 mb-6" style={{ borderColor: 'oklch(0.880 0.012 72)', backgroundColor: '#FFF' }}>
               <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'oklch(0.520 0.015 60)' }}>Desglose de gastos</p>
               <div className="space-y-1.5">
-                {gastos.map(g => (
-                  <div key={g.id} className="flex justify-between text-sm">
-                    <span style={{ color: esHonorario(g) ? 'oklch(0.450 0.060 58)' : 'oklch(0.400 0.018 58)' }}>
-                      {g.descripcion}
-                      {esHonorario(g) && (
-                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded"
-                          style={{ backgroundColor: 'oklch(0.965 0.020 72)', color: 'oklch(0.450 0.060 58)' }}>
-                          → Administradora
-                        </span>
-                      )}
-                      {g.descripcion.toLowerCase().includes('retenci') && totalRetenciones > 0 && (
-                        <span className="ml-2 text-xs px-1.5 py-0.5 rounded"
-                          style={{ backgroundColor: 'oklch(0.970 0.030 30)', color: 'oklch(0.480 0.150 30)' }}>
-                          ⚠️ doble conteo
-                        </span>
-                      )}
-                    </span>
-                    <span style={{ color: 'oklch(0.300 0.018 58)' }}>{fmt(g.monto)}</span>
-                  </div>
-                ))}
+                {gastos.map(g => {
+                  const excluido = esRetencionManual(g)
+                  return (
+                    <div key={g.id} className="flex justify-between text-sm" style={{ opacity: excluido ? 0.45 : 1 }}>
+                      <span style={{ color: esHonorario(g) ? 'oklch(0.450 0.060 58)' : 'oklch(0.400 0.018 58)' }}>
+                        {g.descripcion}
+                        {esHonorario(g) && (
+                          <span className="ml-2 text-xs px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: 'oklch(0.965 0.020 72)', color: 'oklch(0.450 0.060 58)' }}>
+                            → Administradora
+                          </span>
+                        )}
+                        {excluido && (
+                          <span className="ml-2 text-xs px-1.5 py-0.5 rounded"
+                            style={{ backgroundColor: 'oklch(0.945 0.012 72)', color: 'oklch(0.560 0.012 68)' }}>
+                            excluido (ya en facturas)
+                          </span>
+                        )}
+                      </span>
+                      <span style={{ color: excluido ? 'oklch(0.620 0.010 68)' : 'oklch(0.300 0.018 58)', textDecoration: excluido ? 'line-through' : 'none' }}>
+                        {fmt(g.monto)}
+                      </span>
+                    </div>
+                  )
+                })}
                 {tasaSeguridad > 0 && (
                   <div className="flex justify-between text-sm">
                     <span style={{ color: 'oklch(0.600 0.140 50)' }}>Tasa de Seguridad (Gobernación)</span>
@@ -405,9 +401,30 @@ ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caj
                           </p>
                         )}
                         {d.nequi && <p className="text-xs" style={{ color: '#25D366' }}>Nequi: {d.nequi}</p>}
+                        {/* Desglose para la administradora */}
+                        {d.es_administrador && d.honorarios > 0 && (
+                          <div className="mt-1.5 text-xs rounded-lg px-2.5 py-1.5 space-y-0.5"
+                            style={{ backgroundColor: 'oklch(0.965 0.020 72)', color: 'oklch(0.420 0.030 60)' }}>
+                            <div className="flex justify-between">
+                              <span>Honorarios admin (10%)</span>
+                              <span className="font-medium">{fmt(d.honorarios)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Propiedad {d.porcentaje_real}%</span>
+                              <span className="font-medium">{fmt(d.monto)}</span>
+                            </div>
+                            <div className="flex justify-between font-semibold pt-0.5 border-t" style={{ borderColor: 'oklch(0.880 0.020 72)' }}>
+                              <span>Total recibe este mes</span>
+                              <span style={{ color: '#9A7B35' }}>{fmt(d.monto + d.honorarios)}</span>
+                            </div>
+                          </div>
+                        )}
                         <p className="text-xs mt-1.5" style={{ color: 'oklch(0.560 0.012 68)' }}>
                           4×mil: −{fmt(d.cuatromil)} →{' '}
                           <strong style={{ color: 'oklch(0.300 0.018 58)' }}>transferir {fmt(d.neto)}</strong>
+                          {d.es_administrador && d.honorarios > 0 && (
+                            <span style={{ color: 'oklch(0.560 0.012 68)' }}> + {fmt(d.honorarios)} honorarios</span>
+                          )}
                         </p>
                       </div>
                       <div className="text-right flex-shrink-0">

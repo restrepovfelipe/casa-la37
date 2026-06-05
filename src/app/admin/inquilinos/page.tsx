@@ -114,7 +114,11 @@ export default function InquilinosPage() {
                 <Label>Local asignado</Label>
                 <Select value={form.local_id} onValueChange={v => setForm({ ...form, local_id: v ?? '' })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar local" />
+                    {(() => {
+                      const sel = locales.find(l => l.id === form.local_id)
+                      const label = sel ? `${sel.numero}${sel.nombre ? ` — ${sel.nombre}` : ''}` : 'Seleccionar local'
+                      return <span style={{ color: sel ? undefined : 'oklch(0.560 0.012 68)' }}>{label}</span>
+                    })()}
                   </SelectTrigger>
                   <SelectContent className="w-[340px]">
                     {(() => {

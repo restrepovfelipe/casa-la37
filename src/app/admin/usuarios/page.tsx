@@ -249,7 +249,12 @@ export default function UsuariosPage() {
                   setForm({ ...form, inquilino_id: v ?? '', nombre: inq?.nombre ?? form.nombre, email: inq?.email ?? form.email })
                 }}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar inquilino" />
+                    {(() => {
+                      const sel = inquilinos.find(i => i.id === form.inquilino_id)
+                      const loc = sel ? (sel as Inquilino & { locales?: { numero: string } | null }).locales : null
+                      const label = sel ? `${sel.nombre}${loc ? ` — ${loc.numero}` : ''}` : 'Seleccionar inquilino'
+                      return <span style={{ color: sel ? undefined : 'oklch(0.560 0.012 68)' }}>{label}</span>
+                    })()}
                   </SelectTrigger>
                   <SelectContent className="w-[340px]">
                     {inquilinosSinUsuario.map(i => {

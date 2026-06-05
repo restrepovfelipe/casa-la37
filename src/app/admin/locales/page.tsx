@@ -144,7 +144,12 @@ export default function LocalesPage() {
               <div>
                 <Label>Propietario asignado</Label>
                 <Select value={form.propietario_id} onValueChange={v => setForm({ ...form, propietario_id: v ?? '' })}>
-                  <SelectTrigger><SelectValue placeholder="Seleccionar propietario" /></SelectTrigger>
+                  <SelectTrigger>
+                    {(() => {
+                      const sel = propietarios.find(p => p.id === form.propietario_id)
+                      return <span style={{ color: sel ? undefined : 'oklch(0.560 0.012 68)' }}>{sel ? sel.nombre : 'Seleccionar propietario'}</span>
+                    })()}
+                  </SelectTrigger>
                   <SelectContent>
                     {propietarios.map(p => <SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}
                   </SelectContent>

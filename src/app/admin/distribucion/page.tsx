@@ -163,7 +163,7 @@ export default function DistribucionPage() {
         <td style="text-align:right">${fmt(d.monto)}</td>
         <td style="text-align:right;color:#a16207">−${fmt(d.cuatromil)}</td>
         <td style="text-align:right;font-weight:600">${fmt(d.neto)}</td>
-        <td style="font-size:11px">${[d.banco, d.tipo_cuenta, d.numero_cuenta].filter(Boolean).join(' · ')}${d.nequi ? ` | Nequi: ${d.nequi}` : ''}</td>
+        <td style="font-size:11px;padding-left:16px">${[d.banco, d.tipo_cuenta, d.numero_cuenta].filter(Boolean).join(' · ')}${d.nequi ? ` | Nequi: ${d.nequi}` : ''}</td>
       </tr>`).join('')
 
     const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
@@ -190,7 +190,7 @@ ${cajaMenorAnterior > 0 ? `<div class="box"><label>Caja menor anterior</label><d
 ${honorariosAdmin > 0 ? `<div style="background:#FEF9F0;border:1px solid #E8D5A3;border-radius:6px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#78614A">
   Honorarios de administración: ${fmt(honorariosAdmin)} (10% — pagados por el edificio a la administradora como salida)
 </div>` : ''}
-<table><thead><tr><th>Propietario</th><th style="text-align:right">%</th><th style="text-align:right">Bruto</th><th style="text-align:right">4×mil</th><th style="text-align:right">Neto</th><th>Cuenta</th></tr></thead>
+<table><thead><tr><th>Propietario</th><th style="text-align:right">%</th><th style="text-align:right">Bruto</th><th style="text-align:right">4×mil</th><th style="text-align:right">Neto</th><th style="padding-left:16px">Cuenta</th></tr></thead>
 <tbody>${rows}</tbody></table>
 ${cajaMenor !== 0 ? `<p style="margin-top:12px;font-size:12px;color:#78614A">Caja menor: ${fmt(cajaMenor)}</p>` : ''}
 <div class="footer">Casa La37 · Carrera 37 #10-37, Medellín</div>

@@ -75,9 +75,19 @@ export default function InquilinosPage() {
       activo: form.activo,
     }
     if (editId) {
-      await supabase.from('inquilinos').update(payload).eq('id', editId)
+      const { error } = await supabase.from('inquilinos').update(payload).eq('id', editId)
+      if (error) {
+        alert('Error al editar: ' + error.message)
+        setLoading(false)
+        return
+      }
     } else {
-      await supabase.from('inquilinos').insert(payload)
+      const { error } = await supabase.from('inquilinos').insert(payload)
+      if (error) {
+        alert('Error al guardar: ' + error.message)
+        setLoading(false)
+        return
+      }
     }
     await cargar()
     setOpen(false)

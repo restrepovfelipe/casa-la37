@@ -32,7 +32,7 @@ function whatsAppServicios(factura: Factura & { locales: Local; periodos: Period
   const local = factura.locales
   const periodo = factura.periodos
   const limite = periodo?.fecha_limite_pago
-    ? `\n📆 Fecha límite: ${new Date(periodo.fecha_limite_pago + 'T12:00:00').toLocaleDateString('es-CO')}`
+    ? `\nFecha limite: ${new Date(periodo.fecha_limite_pago + 'T12:00:00').toLocaleDateString('es-CO')}`
     : ''
 
   const texto = `*Casa La37 — ${local?.numero}${local?.nombre ? ` ${local.nombre}` : ''}*

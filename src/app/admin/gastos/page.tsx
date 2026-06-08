@@ -31,7 +31,13 @@ export default function GastosPage() {
 
   useEffect(() => {
     supabase.from('periodos').select('*').order('anio', { ascending: false }).order('mes', { ascending: false })
-      .then(({ data }) => { if (data) setPeriodos(data) })
+      .then(({ data }) => {
+        if (!data) return
+        setPeriodos(data)
+        const hoy = new Date()
+        const actual = data.find(p => p.mes === hoy.getMonth() + 1 && p.anio === hoy.getFullYear())
+        if (actual) setPeriodoId(actual.id)
+      })
   }, [])
 
   useEffect(() => {

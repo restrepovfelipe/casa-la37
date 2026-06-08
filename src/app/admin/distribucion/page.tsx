@@ -29,7 +29,12 @@ export default function DistribucionPage() {
       supabase.from('periodos').select('*').order('anio', { ascending: false }).order('mes', { ascending: false }),
       supabase.from('propietarios').select('*').order('nombre'),
     ])
-    if (per) setPeriodos(per)
+    if (per) {
+      setPeriodos(per)
+      const hoy = new Date()
+      const actual = per.find((p: Periodo) => p.mes === hoy.getMonth() + 1 && p.anio === hoy.getFullYear())
+      if (actual) setPeriodoId(actual.id)
+    }
     if (props) setPropietarios(props)
   }
 

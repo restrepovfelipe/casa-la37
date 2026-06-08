@@ -33,7 +33,12 @@ export default function LecturasPage() {
       supabase.from('periodos').select('*').order('anio', { ascending: false }).order('mes', { ascending: false }),
       supabase.from('locales').select('*').eq('activo', true).order('numero'),
     ])
-    if (per) setPeriodos(per)
+    if (per) {
+      setPeriodos(per)
+      const hoy = new Date()
+      const actual = per.find((p: Periodo) => p.mes === hoy.getMonth() + 1 && p.anio === hoy.getFullYear())
+      if (actual) setPeriodoId(actual.id)
+    }
     if (loc) setLocales(loc)
   }
 

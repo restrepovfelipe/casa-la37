@@ -191,7 +191,12 @@ export default function FacturasPage() {
       supabase.from('locales').select('*, propietarios(*)').eq('activo', true).order('numero'),
       supabase.from('inquilinos').select('local_id, telefono').eq('activo', true),
     ])
-    if (per) setPeriodos(per)
+    if (per) {
+      setPeriodos(per)
+      const hoy = new Date()
+      const actual = per.find((p: Periodo) => p.mes === hoy.getMonth() + 1 && p.anio === hoy.getFullYear())
+      if (actual) setPeriodoId(actual.id)
+    }
     if (loc) setLocales(loc)
     if (inq) setInquilinos(inq)
   }

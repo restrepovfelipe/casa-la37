@@ -15,12 +15,16 @@ function whatsAppArriendo(factura: Factura & { locales: Local; periodos: Periodo
   const local = factura.locales
   const periodo = factura.periodos
 
+  const diaFirma = local?.fecha_inicio_contrato
+    ? new Date(local.fecha_inicio_contrato + 'T12:00:00').getDate()
+    : 1
+
   const texto = `*Casa La37 — ${local?.numero}${local?.nombre ? ` ${local.nombre}` : ''}*
 *Arriendo ${MESES[periodo.mes - 1]} ${periodo.anio}*
 
 *${formatCOP(factura.arriendo)}*
 
-Por favor realizar el pago a mas tardar el dia 1 del mes.
+Por favor realizar el pago a mas tardar el dia ${diaFirma} del mes.
 
 _Carrera 37 #10-37, Medellin_`
 
@@ -300,11 +304,23 @@ export default function FacturasPage() {
   const formatCOP = (n: number) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
 
-  const estaVencida = (f: Factura) => {
-    if (!periodo?.fecha_limite_pago) return false
-    return new Date(periodo.fecha_limite_pago) < hoy &&
-      (f.estado_servicios === 'pendiente' || f.estado_arriendo === 'pendiente')
+  const serviciosVencidos = (f: Factura) => {
+    if (!periodo?.fecha_limite_pago || f.estado_servicios !== 'pendiente') return false
+    return new Date(periodo.fecha_limite_pago + 'T23:59:59') < hoy
   }
+
+  const arriendoVencido = (f: Factura & { locales: Local }) => {
+    if (f.estado_arriendo !== 'pendiente' || !periodo) return false
+    const local = f.locales as Local
+    const diaFirma = local?.fecha_inicio_contrato
+      ? new Date(local.fecha_inicio_contrato + 'T12:00:00').getDate()
+      : null
+    if (!diaFirma) return false
+    const fechaLimite = new Date(`${periodo.anio}-${String(periodo.mes).padStart(2, '0')}-${String(diaFirma).padStart(2, '0')}T23:59:59`)
+    return fechaLimite < hoy
+  }
+
+  const estaVencida = (f: Factura & { locales: Local }) => serviciosVencidos(f) || arriendoVencido(f)
 
   const totalServicios = facturas.reduce((s, f) => s + f.total_servicios, 0)
   const totalArriendos = facturas.reduce((s, f) => s + f.arriendo, 0)
@@ -431,6 +447,9 @@ export default function FacturasPage() {
               const local = f.locales as Local
               const prop = local?.propietarios as Propietario
               const vencida = estaVencida(f)
+              const diaVenceArriendo = local?.fecha_inicio_contrato
+                ? new Date(local.fecha_inicio_contrato + 'T12:00:00').getDate()
+                : null
               const telefono = inquilinos.find(i => i.local_id === local?.id)?.telefono
 
               return (
@@ -558,6 +577,7 @@ export default function FacturasPage() {
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-sm font-medium" style={{ color: 'oklch(0.185 0.020 55)' }}>
                             Arriendo <span style={{ color: 'oklch(0.520 0.015 60)', fontWeight: 400 }}>{formatCOP(f.arriendo)}</span>
+                            {diaVenceArriendo && <span className="text-xs ml-1" style={{ color: arriendoVencido(f) ? 'oklch(0.540 0.180 30)' : 'oklch(0.560 0.012 68)' }}>(vence día {diaVenceArriendo})</span>}
                           </span>
                           {f.estado_arriendo === 'pagado' ? (
                             <div className="text-right">

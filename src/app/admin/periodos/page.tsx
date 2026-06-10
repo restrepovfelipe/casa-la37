@@ -20,6 +20,10 @@ const estadoColor: Record<string, 'default' | 'secondary' | 'destructive' | 'out
 const anioActual = new Date().getFullYear()
 const mesActual = new Date().getMonth() + 1
 
+function fechaLimite29(mes: string, anio: string) {
+  return `${anio}-${String(mes).padStart(2, '0')}-29`
+}
+
 export default function PeriodosPage() {
   const [periodos, setPeriodos] = useState<Periodo[]>([])
   const [open, setOpen] = useState(false)
@@ -30,7 +34,7 @@ export default function PeriodosPage() {
     telesentinel: '',
     dias_aide: '',
     tasa_seguridad: '',
-    fecha_limite_pago: '',
+    fecha_limite_pago: fechaLimite29(mesActual.toString(), anioActual.toString()),
   })
   const supabase = createClient()
 
@@ -90,7 +94,7 @@ export default function PeriodosPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Mes</Label>
-                  <Select value={form.mes} onValueChange={v => setForm({ ...form, mes: v ?? '' })}>
+                  <Select value={form.mes} onValueChange={v => setForm({ ...form, mes: v ?? '', fecha_limite_pago: fechaLimite29(v ?? '', form.anio) })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {MESES.map((m, i) => (
@@ -101,7 +105,7 @@ export default function PeriodosPage() {
                 </div>
                 <div>
                   <Label>Año</Label>
-                  <Input type="number" value={form.anio} onChange={e => setForm({ ...form, anio: e.target.value })} />
+                  <Input type="number" value={form.anio} onChange={e => setForm({ ...form, anio: e.target.value, fecha_limite_pago: fechaLimite29(form.mes, e.target.value) })} />
                 </div>
               </div>
               <div>
